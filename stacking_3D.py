@@ -7,49 +7,6 @@ plt.style.use("mnras.mplstyle")
 
 box = "L1000N1800"    
 
-def stack_fixed_bins(data, split, split_bins):
-    """
-    For a given set of bins. Stack the DM and gas density profiles for a 
-    given run according to a given stacking criteria. Assigns values with
-    appropriate name to obj.
-    
-    Inputs.
-    data: obj, run of choice
-    split: str, name of stacking criteria
-    split_bins: bins to use to split stacking criteria.
-    """
-    if split == "mass":
-        split_data = np.log10(data.M200m)
-    else:
-        split_data = getattr(data, split)
-    not_nan = np.where(np.isfinite(split_data)==True)[0]
-    #will return 0 or len for values outside the range
-    bins_sort = np.digitize(split_data[not_nan], split_bins)
-    N_bins = len(split_bins)+1
-    
-    stacked_DM = np.zeros((N_bins, N_rad))
-    stacked_gas = np.zeros((N_bins, N_rad))
-    
-    print("")
-    for i in range(N_bins):
-        bin_mask = np.where(bins_sort == i)[0]
-        stacked_DM[i,:] = sp.stack_data(data.DM_density_3D[not_nan][bin_mask,:])
-        stacked_gas[i,:] = sp.stack_data(data.gas_density_3D[not_nan][bin_mask,:])
-        print(len(bin_mask))
-        
-    log_DM = sp.log_gradients(rad_mid, stacked_DM)
-    R_SP_DM, depth_DM = dr.depth_cut(rad_mid, log_DM, depth_value="y")
-    log_gas = sp.log_gradients(rad_mid, stacked_gas)
-    R_SP_gas, depth_gas = dr.depth_cut(rad_mid, log_gas, cut=-2.5, depth_value="y")
-    
-    setattr(data, "R_DM_"+split, R_SP_DM)
-    setattr(data, "R_gas_"+split, R_SP_gas)
-    setattr(data, split+"_log_DM", log_DM)
-    setattr(data, split+"_log_gas", log_gas)
-    setattr(data, "depth_DM_"+split, depth_DM)
-    setattr(data, "depth_gas_"+split, depth_gas)
-
-
 def bin_profiles(d, accretion_bins, mass_bins, energy_bins):
     """
     Takes a given run object and bins the density profiles according to
@@ -62,16 +19,42 @@ def bin_profiles(d, accretion_bins, mass_bins, energy_bins):
     mass_bins: array giving edge values of bins of mass
     energy_bins: array giving edge values of bins of energy ratio.
     """
-    stack_fixed_bins(d, "accretion", accretion_bins)
+
+    sp.stack_and_find_3D(d, "accretion", accretion_bins)
     d.grad_accretion = np.sqrt(np.nanmean((d.R_gas_accretion/d.R_DM_accretion)**2))
-    stack_fixed_bins(d, "mass", mass_bins)
+    sp.stack_and_find_3D(d, "mass", mass_bins)
     d.grad_mass = np.sqrt(np.nanmean((d.R_gas_mass/d.R_DM_mass)**2))
-    stack_fixed_bins(d, "energy", energy_bins)
+    sp.stack_and_find_3D(d, "energy", energy_bins)
     d.grad_energy = np.sqrt(np.nanmean((d.R_gas_energy/d.R_DM_energy)**2))
     
 
 def plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, bins, 
                                plot="_log_DM", stack_type="accretion"):
+    """
+    Plots dlogrho/dlogr profiles for different runs for same stacking criteria.
+
+    Parameters
+    ----------
+    flm_HF : obj
+        "Standard" run data.
+    flm_HWA : obj
+        First alternative run.
+    flm_HSA : obj
+        Second alternative run.
+    bins : numpy array
+        Bins used to stack profiles.
+    plot : str, optional
+        Plot DM or gas profiles. The default is "_log_DM". 
+        Alternative is "_log_gas"
+    stack_type : TYPE, optional
+        Which stacking criteria to use for the profiles. 
+        The default is "accretion".
+
+    Returns
+    -------
+    None.
+
+    """
     if stack_type=="accretion":
         symbol = "$\Gamma$"
     elif stack_type=="mass":
@@ -80,7 +63,7 @@ def plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, bins,
         symbol="$E_{\\rm{kin}} /E_{\\rm{therm}}$"
     
     ylim = (-4,0.2)
-    N_bins = len(bins)+1
+    N_bins = len(bins) - 1
     fig, ax = plt.subplots(nrows=1, ncols=3, 
                            figsize=(6,2.5), 
                            sharey=True,
@@ -91,13 +74,13 @@ def plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, bins,
     lw = 0.8
     for i in range(0, N_bins):
         if i == 0:
-            label = symbol + "$<$" + str(np.round(bins[i],2))
+            label = symbol + "$<$" + str(np.round(bins[1],2))
         elif i == N_bins-1:
-            label = symbol + "$>$" + str(np.round(bins[i-1],2))
+            label = symbol + "$>$" + str(np.round(bins[i],2))
         else:
-            label = str(np.round(bins[i-1],2)) \
+            label = str(np.round(bins[i],2)) \
             + "$<$" + symbol + "$<$" \
-            + str(np.round(bins[i],2))
+            + str(np.round(bins[i+1],2))
         ax[1].semilogx(rad_mid, getattr(flm_HF, stack_type+plot)[i,:], 
                        color=cm_HF[i], linewidth=lw,
                        label=label)
@@ -128,10 +111,33 @@ def plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, bins,
 
 def plot_profiles_compare_all(flm_HF, flm_HWA, flm_HSA, bins,
                               quantity="DM"):
+    """
+    Compares all profiles for three different runs and three standard stacking
+    criteria.
+
+    Parameters
+    ----------
+    flm_HF : obj
+        "Standard" run data.
+    flm_HWA : obj
+        First alternative run.
+    flm_HSA : obj
+        Second alternative run.
+    bins : numpy array
+        Bins used to stack profiles for all three stacking criteria. 
+        (3,N_bins) In order: accretion rate, mass, energy ratio.
+    quantity : str, optional
+        Plot either gas or DM profiles. The default is "DM".
+
+    Returns
+    -------
+    None.
+
+    """
     
     bin_type = np.array(["accretion", "mass", "energy"])
     labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$E_{\\rm{kin}} / E_{\\rm{therm}}$"])
-    N_bins = bins.shape[1] + 1
+    N_bins = bins.shape[1] -1
     if quantity == "DM":
         ylim = (-4.6,0.5)
         location = "upper left"
@@ -149,13 +155,13 @@ def plot_profiles_compare_all(flm_HF, flm_HWA, flm_HSA, bins,
     for i in range(0, N_bins):
         for j in range(3):
             if i == 0:
-                label = labels[j] + "$<$"  + str(np.round(bins[j,i],2))
+                label = labels[j] + "$<$"  + str(np.round(bins[j,1],2))
             elif i == N_bins-1:
-                label = labels[j] + "$>$" + str(np.round(bins[j,i-1],2))
+                label = labels[j] + "$>$" + str(np.round(bins[j,i],2))
             else:
-                label = str(np.round(bins[j,i-1],2)) \
+                label = str(np.round(bins[j,i],2)) \
                     + "$<$" + labels[j] + "$<$" \
-                    + str(np.round(bins[j,i],2))
+                    + str(np.round(bins[j,i+1],2))
             if j == 0:
                 cm = cm1
             elif j==1:
@@ -175,9 +181,9 @@ def plot_profiles_compare_all(flm_HF, flm_HWA, flm_HSA, bins,
     ax[1,0].text(0.05, 0.05, "HYDRO_FIDUCIAL", transform=ax[1,0].transAxes)
     ax[2,0].text(0.05, 0.05, "HYDRO_STRONG_AGN", transform=ax[2,0].transAxes)
     ax[2,1].set_xlabel("$r/R_{\\rm{200m}}$")
-    ax[1,0].set_ylabel(r"$d \log \rho_{{\rm{{{}}}}} / d \log r$".format(quantity)) #need to change this label manually atm
+    ax[1,0].set_ylabel(r"$d \log \rho_{{\rm{{{}}}}} / d \log r$".format(quantity))
     filename = "splashback_data/flamingo/plots/HF_compare_all_" + quantity + ".png"
-    plt.savefig(filename, dpi=300)
+    # plt.savefig(filename, dpi=300)
     plt.show()
     
 def plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
@@ -208,8 +214,8 @@ def plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
     bins = np.vstack((accretion_bins, mass_bins, energy_bins))
     bin_type = np.array(["accretion", "mass", "energy"])
     labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$E_{\\rm{kin}} / E_{\\rm{therm}}$"])
-    N_bins = len(accretion_bins) + 1
-    ylim = (-4,0.5)
+    N_bins = len(accretion_bins) - 1
+    ylim = (-5,0.5)
     fig, ax = plt.subplots(nrows=3, ncols=1, 
                            figsize=(3,6), 
                            sharey=True,
@@ -218,16 +224,16 @@ def plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
     cm2 = plt.cm.winter(np.linspace(0,1,N_bins))
     cm3 = plt.cm.copper(np.linspace(0,1,N_bins))
     lw = 0.8
-    for i in range(0, N_bins):
+    for i in range(N_bins):
         for j in range(3):
             if i == 0:
-                label = labels[j] + "$<$"  + str(np.round(bins[j,i],2))
+                label = labels[j] + "$<$"  + str(np.round(bins[j,i+1],2))
             elif i == N_bins-1:
-                label = labels[j] + "$>$" + str(np.round(bins[j,i-1],2))
+                label = labels[j] + "$>$" + str(np.round(bins[j,i],2))
             else:
-                label = str(np.round(bins[j,i-1],2)) \
+                label = str(np.round(bins[j,i],2)) \
                     + "$<$" + labels[j] + "$<$" \
-                    + str(np.round(bins[j,i],2))
+                    + str(np.round(bins[j,i+1],2))
             if j == 0:
                 cm = cm1
             elif j==1:
@@ -244,7 +250,7 @@ def plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
     ax[1].legend()
     ax[2].legend()
     ax[2].set_xlabel("$r/R_{\\rm{200m}}$")
-    ax[1].set_ylabel("$d \log \\rho_{\\rm{DM}} / d \log r$") #need to change this label manually atm
+    ax[1].set_ylabel(r"$d \log \rho_{{\rm{{{}}}}} / d \log r$".format(quantity))
     # filename = "splashback_data/flamingo/plots/HF_compare_bins.png"
     # plt.savefig(filename, dpi=300)
     plt.show()
@@ -498,10 +504,13 @@ def plot_Rsp_gamma(flm_HF, flm_HWA, flm_HSA, plot_name, bins):
 
     
 def stack_for_profiles():
-    N_bins = 3
-    mass_bins = np.linspace(14.1, 15, N_bins+1)
-    accretion_bins = np.linspace(1, 4, N_bins+1)
-    energy_bins = np.linspace(0.1, 0.3, N_bins+1)
+    N_bins = 4
+    mass_bins = np.linspace(14, 15, N_bins+1)
+    mass_bins = np.append(mass_bins, 16)
+    accretion_bins = np.linspace(0, 4, N_bins+1)
+    accretion_bins = np.append(accretion_bins, 20)
+    energy_bins = np.linspace(0.05, 0.3, N_bins+1)
+    energy_bins = np.append(energy_bins, 1)
     
     bin_profiles(flm_HF, accretion_bins, mass_bins, energy_bins)
     bin_profiles(flm_HWA, accretion_bins, mass_bins, energy_bins)
@@ -533,49 +542,43 @@ def stack_for_profiles():
     
 def stack_for_Rsp():
     N_bins = 10
-    mass_bins = np.linspace(14.1, 15.3, N_bins+1)
-    accretion_bins = np.linspace(1, 4, N_bins+1)
-    energy_bins = np.linspace(0.1, 0.3, N_bins+1)
+    mass_bins = np.linspace(14, 15, N_bins+1)
+    mass_bins = np.append(mass_bins, 16)
+    accretion_bins = np.linspace(0, 4, N_bins+1)
+    accretion_bins = np.append(accretion_bins, 20)
+    energy_bins = np.linspace(0.05, 0.3, N_bins+1)
+    energy_bins = np.append(energy_bins, 1)
     
     bin_profiles(flm_HF, accretion_bins, mass_bins, energy_bins)
     bin_profiles(flm_HWA, accretion_bins, mass_bins, energy_bins)
     bin_profiles(flm_HSA, accretion_bins, mass_bins, energy_bins)
     
-    mass_mid = np.zeros(N_bins+2)
-    accretion_mid = np.zeros(N_bins+2)
-    energy_mid = np.zeros(N_bins+2)
-    mass_mid[0] = mass_bins[0]
-    accretion_mid[0] = accretion_bins[0]
-    energy_mid[0] = energy_bins[0]
-    mass_mid[1:-1] = (mass_bins[:-1] + mass_bins[1:])/2
-    accretion_mid[1:-1] = (accretion_bins[:-1] + accretion_bins[1:])/2
-    energy_mid[1:-1] = (energy_bins[:-1] + energy_bins[1:])/2
-    mass_mid[-1] = mass_bins[-1]
-    accretion_mid[-1] = accretion_bins[-1]
-    energy_mid[-1] = energy_bins[-1]
-    
+    mass_mid = np.zeros(N_bins+1)
+    accretion_mid = np.zeros(N_bins+1)
+    energy_mid = np.zeros(N_bins+1)
+
+    mass_mid[:-1] = (mass_bins[:-2] + mass_bins[1:-1])/2
+    accretion_mid[:-1] = (accretion_bins[:-2] + accretion_bins[1:-1])/2
+    energy_mid[:-1] = (energy_bins[:-2] + energy_bins[1:-1])/2
+    mass_mid[-1] = mass_bins[-2]
+    accretion_mid[-1] = accretion_bins[-2]
+    energy_mid[-1] = energy_bins[-2]
+
     mids = np.vstack((accretion_mid, mass_mid, energy_mid))
     
     # Make big plot comparing Rsp for different runs and stacking criteria.
-    # plot_Rsp_scatter(flm_HF, flm_HWA, flm_HSA, mids)
-    
+    plot_Rsp_scatter(flm_HF, flm_HWA, flm_HSA, mids)
     
     # Compare splashback with different quantities
     # plot_Rsp_params(flm_HF, flm_HWA, flm_HSA, "depth_gas", mids)
     # plot_Rsp_gamma(flm_HF, flm_HWA, flm_HSA, "energy", energy_mid)
     
     
+N_rad = 44
+log_radii = np.linspace(-1, 0.7, N_rad+1)
+rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
 
 if __name__ == "__main__":
-    # N_rad = 71
-    # log_radii = np.linspace(-1, 0.9, N_rad)
-    # rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
-    # N_bins = 5
-    
-    N_rad = 44
-    log_radii = np.linspace(-1, 0.7, N_rad+1)
-    rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
-    
     flm_HF = sp.flamingo(box, "HF")
     flm_HF.read_properties()
 
@@ -585,22 +588,26 @@ if __name__ == "__main__":
     flm_HSA = sp.flamingo(box, "HSA")
     flm_HSA.read_properties()
     
-    stack_for_profiles()
-    # stack_for_Rsp()
+    # stack_for_profiles()
+    stack_for_Rsp()
+    
+    # index = 2
+    # test_density = flm_HF.DM_density_3D[index,:]
+    # test_gradient = np.gradient(np.log10(test_density), np.log10(rad_mid))
     
     # plt.figure()#figsize=(1.5,1.5))
-    # plt.semilogx(rad_mid, flm_HF.accretion_log_DM[2,:], color="k")
+    # plt.semilogx(rad_mid, test_gradient, color="k")
     # xlim = plt.gca().get_xlim()
     # ylim = plt.gca().get_ylim()
-    # plt.semilogx((flm_HF.R_DM_accretion[2], flm_HF.R_DM_accretion[2]), ylim,
-    #               color="blueviolet", linestyle="--")
+    # # plt.semilogx((flm_HF.R_DM_accretion[2], flm_HF.R_DM_accretion[2]), ylim,
+    # #               color="blueviolet", linestyle="--")
     # plt.fill_between(xlim, (ylim[0],ylim[0]), (-3,-3), facecolor="grey", alpha=0.6)
     # plt.xlim(xlim)
     # plt.ylim(ylim)
     # plt.xlabel("$r/R_{\\rm{200m}}$")
     # plt.ylabel("$d \log \\rho_{\\rm{DM}} / d \log r$")
-    # # plt.savefig("splashback_data/flamingo/plots/example_splashback_feature.png",
-    # #             dpi=300)
+    # plt.savefig("splashback_data/flamingo/plots/example_noise.png",
+    #             dpi=300)
     # plt.show()
     
     
