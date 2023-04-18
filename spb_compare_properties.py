@@ -16,13 +16,18 @@ rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
 log_DM_density = sp.log_gradients(rad_mid, flm.DM_density_3D)
 log_gas_density = sp.log_gradients(rad_mid, flm.gas_density_3D)
 
-Rsp_DM_3D = dr.standard(rad_mid, log_DM_density)
-Rsp_gas_3D = dr.DM_prior_new(rad_mid, log_gas_density, Rsp_DM_3D)
+# Rsp_DM_3D = dr.standard(rad_mid, log_DM_density)
+# Rsp_gas_3D = dr.DM_prior_new(rad_mid, log_gas_density, Rsp_DM_3D)
 
 flm.read_properties()
 
+flm.sphericity_gas = np.genfromtxt(flm.path + "_sphericity_gas.csv",
+                                delimiter=",")
+flm.sphericity_DM = np.genfromtxt(flm.path + "_sphericity_DM.csv",
+                                delimiter=",")
+
 plot_data = np.vstack((np.log10(flm.M200m), flm.accretion, flm.energy,
-                       flm.hot_gas_fraction, flm.baryon_fraction)).T
+                       flm.sphericity_gas, flm.sphericity_DM)).T
 list_good = np.intersect1d(
     np.intersect1d(np.intersect1d(np.where(np.isfinite(plot_data[:,0]))[0], np.where(np.isfinite(plot_data[:,1]))[0]),
     np.intersect1d(np.where(np.isfinite(plot_data[:,2]))[0], np.where(np.isfinite(plot_data[:,3]))[0])),
@@ -40,7 +45,7 @@ fig= corner.corner(
     fig=fig,
     plot_contours=True, plot_density=False, plot_datapoints=True,
     labels=[r'$\log M_{\rm{200m}}$', r'$\Gamma$', r'$E_{\rm{kin}}/E_{\rm{therm}}$',
-            r'$f_{\rm{gas}}$', r'$f_{\rm{baryon}}$'],
+            r'$S_{\rm{gas}}$', r'$S_{\rm{DM}}$'],
     data_kwargs=dict(alpha=0.8, color='cornflowerblue'),
     hist_kwargs=dict(linewidth=0.8, color='cornflowerblue', histtype='stepfilled', density=True),
     hist2d_kwargs=dict(linewidth=0.8),
@@ -68,8 +73,8 @@ for i in range(5):
 ax[0, 0].set_ylabel(r'$P(\log M_{\rm{200m}})$')
 ax[1, 1].set_ylabel(r'$P(\Gamma)$')
 ax[2, 2].set_ylabel(r'$P(E_{\rm{kin}}/E_{\rm{therm}})$')
-ax[3, 3].set_ylabel(r'$P(f_{\rm{gas}})$')
-ax[4, 4].set_ylabel(r'$P(f_{\rm{baryon}})$')
+ax[3, 3].set_ylabel(r'$P(S_{\rm{gas}})$')
+ax[4, 4].set_ylabel(r'$P(S_{\rm{DM}})$')
 
 # # Legend
 # handles=[
@@ -87,32 +92,32 @@ ax[4,0].set_xlim((14.0,15.55))
 ax[1,1].set_xlim((0,8))
 ax[2,1].set_xlim((0,8))
 ax[3,1].set_xlim((0,8))
-ax[4,1].set_ylim((0,8))
+ax[4,1].set_xlim((0,8))
 
 ax[2,2].set_xlim((0,0.5))
 ax[3,2].set_xlim((0,0.5))
 ax[4,2].set_xlim((0,0.5))
 
-ax[3,3].set_xlim((0.96,1.001))
-ax[4,3].set_xlim((0.96,1.001))
+ax[3,3].set_xlim((0.21,0.99))
+ax[4,3].set_xlim((0.21,0.99))
 
-ax[4,4].set_xlim((0.09,0.15))
+#ax[4,4].set_xlim((0.09,0.15))
 
 ax[1,0].set_ylim((0,8))
 
 ax[2,0].set_ylim((0,0.5))
 ax[2,1].set_ylim((0,0.5))
 
-ax[3,0].set_ylim((0.96,1.001))
-ax[3,1].set_ylim((0.96,1.001))
-ax[3,2].set_ylim((0.96,1.001))
+ax[3,0].set_ylim((0.21,0.99))
+ax[3,1].set_ylim((0.21,0.99))
+ax[3,2].set_ylim((0.21,0.99))
 
-ax[4,0].set_ylim((0.09,0.15))
-ax[4,1].set_ylim((0.09,0.15))
-ax[4,2].set_ylim((0.09,0.15))
-ax[4,3].set_ylim((0.09,0.15))
+#ax[4,0].set_ylim((0.09,0.15))
+#ax[4,1].set_ylim((0.09,0.15))
+#ax[4,2].set_ylim((0.09,0.15))
+#ax[4,3].set_ylim((0.09,0.15))
 
-# plt.savefig('splashback_data/flamingo/plots/cornerplot.png')
+plt.savefig('splashback_data/flamingo/plots/cornerplot.png')
 plt.show()
 
 
