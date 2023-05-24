@@ -8,4 +8,5 @@ test_projection_shells.py
 splashback_temp.py
 depth_check.py
 pressure_check.py
-
+.ipynb_checkpoints/
+dm_2D_analysis.py
