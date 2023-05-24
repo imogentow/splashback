@@ -6,19 +6,34 @@ from math import factorial
 import determine_radius as dr
 
 PATH = "splashback_data/"
-        
+       
+names = {
+    "HF": "HYDRO_FIDUCIAL",
+    "HWA": "HYDRO_WEAK_AGN",
+    "HSA": "HYDRO_STRONG_AGN",
+    "HTA": "HYDRO_STRONGER_AGN",
+    "HUA": "HYDRO_STRONGEST_AGN",
+    "HP": "HYDRO_PLANCK",
+    "HPV": "HYDRO_PLANCK_LARGE_NU_VARY",
+    "HPF": "HYDRO_PLANCK_LARGE_NU_FIXED",
+    "HJ": "HYDRO_JETS",
+    "HSJ": "HYDRO_STRONG_JETS",
+    "HSS": "HYDRO_STRONG_SUPERNOVA",
+    "DMO": "DARK_MATTER_ONLY"} 
 class flamingo:
     """Read flamingo data"""
     def __init__(self, box, run):
         #3D profiles
         self.box = box
         self.run = run
+        self.run_label = names[self.run]
         self.path = PATH + "flamingo/" + box + "_" + run
         
         self.DM_density_3D = np.genfromtxt(self.path + "_3D_DM_density_all.csv", 
                                            delimiter=",") #1e10Msol / (r/R200m)^3
-        self.gas_density_3D = np.genfromtxt(self.path + "_3D_gas_density_all.csv", 
-                                           delimiter=",")
+        if self.run != "DMO":
+            self.gas_density_3D = np.genfromtxt(self.path + "_3D_gas_density_all.csv", 
+                                               delimiter=",")
         
         self.N_rad = 44
         self.log_radii = np.linspace(-1, 0.7, self.N_rad+1)
@@ -52,27 +67,30 @@ class flamingo:
                                   delimiter=",")
         accretion[np.isinf(accretion)] = np.nan
         self.accretion = accretion
-        gas_properties = np.genfromtxt(self.path + "_gas_properties_all.csv",
-                                       delimiter=",")
-        
-        self.energy = gas_properties[:,2]
-        self.hot_gas_fraction = gas_properties[:,1]
-        self.baryon_fraction = gas_properties[:,0]
         self.M200m = np.genfromtxt(self.path + "_M200m.csv",
                                    delimiter=",")
+        if self.run != "DMO":
+            gas_properties = np.genfromtxt(self.path + "_gas_properties_all.csv",
+                                       delimiter=",")
+            self.energy = gas_properties[:,2]
+            self.hot_gas_fraction = gas_properties[:,1]
+            self.baryon_fraction = gas_properties[:,0]
+        
         
     def read_low_mass(self):
         """Read low mass data when needed to save memory"""
         DM_density_3D_low = np.genfromtxt(self.path + "_3D_DM_density_low_mass_all.csv", 
                                           delimiter=",") #1e10Msol / (r/R200m)^3
-        gas_density_3D_low = np.genfromtxt(self.path + "_3D_gas_density_low_mass_all.csv", 
-                                           delimiter=",")
+        if self.run != "DMO":
+            gas_density_3D_low = np.genfromtxt(self.path + "_3D_gas_density_low_mass_all.csv", 
+                                               delimiter=",")
+            self.gas_density_3D = np.vstack((self.gas_density_3D, gas_density_3D_low))
+            
         M200m_low = np.genfromtxt(self.path + "_M200m_low_mass.csv",
                                   delimiter=",")
         accretion_low = np.genfromtxt(self.path + "_accretion_low_mass.csv",
                                       delimiter=",")
         self.DM_density_3D = np.vstack((self.DM_density_3D, DM_density_3D_low))
-        self.gas_density_3D = np.vstack((self.gas_density_3D, gas_density_3D_low))
         self.M200m = np.hstack((self.M200m, M200m_low))
         self.accretion = np.hstack((self.accretion, accretion_low))
         
@@ -158,9 +176,14 @@ def stack_and_find_3D(data, split, split_bins):
     stack_fixed(data, split, split_bins)
     log_DM = getattr(data, split+"_log_DM")
     log_gas = getattr(data, split+"_log_gas")
-    R_SP_DM, depth_DM = dr.depth_cut(data.rad_mid, log_DM, depth_value="y")
+    R_SP_DM, second_DM, depth_DM, depth_second = dr.depth_cut(data.rad_mid, 
+                                                              log_DM, 
+                                                              cut=-2.5,
+                                                              depth_value="y",
+                                                              second_caustic="y")
     R_SP_gas, depth_gas = dr.depth_cut(data.rad_mid, log_gas, cut=-2.5, depth_value="y")
     setattr(data, "R_DM_"+split, R_SP_DM)
+    setattr(data, "2_DM_"+split, second_DM)
     setattr(data, "R_gas_"+split, R_SP_gas)
     setattr(data, "depth_DM_"+split, depth_DM)
     setattr(data, "depth_gas_"+split, depth_gas)
@@ -214,11 +237,9 @@ def stack_data(array):
     returns 
     profile - 1D array, same number of rad bins as above"""
     N_bins = np.shape(array)[1]
-    
     profile = np.zeros(N_bins)
     for i in range(N_bins):
         profile[i] = np.nanmedian(array[:,i])
-    
     return profile
 
     
@@ -262,7 +283,7 @@ def log_gradients(radii, array, window=19, order=4):
         
         dlnrho_dlnr = np.gradient(np.log10(density), np.log10(temp_radii)) 
         smoothed_array[i,finite] = savitzky_golay(dlnrho_dlnr, window_size=window,
-                                             order=order)
+                                              order=order)
     if N == 1:
         smoothed_array = smoothed_array.flatten()
         
