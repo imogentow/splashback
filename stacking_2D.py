@@ -398,7 +398,7 @@ def stack_for_profiles():
     
     
 def stack_for_Rsp():
-    N_bins = 15
+    N_bins = 10
     mass_bins = np.linspace(14, 15, N_bins)
     mass_bins = np.append(mass_bins, 16)
     accretion_bins = np.linspace(0, 4, N_bins)
@@ -456,7 +456,7 @@ def stack_for_Rsp():
     # check_proj_Rsp(flm, mids, "SZ")
     # check_proj_Rsp(flm, mids, "WL")
     
-    scatter_compare(flm, mids[3:,:])
+    # scatter_compare(flm, mids[3:,:])
     scatter_compare_sw(flm, mids[3:,:])
     
     # plt.scatter(c_mid, flm.R_EM_concentration)
