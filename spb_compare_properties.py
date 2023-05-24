@@ -6,7 +6,7 @@ import corner
 
 plt.style.use("mnras.mplstyle")
 
-box = "L1000N1800"
+box = "L2800N5040"
 flm = sp.flamingo(box, "HF")
 
 N_bins = 45
