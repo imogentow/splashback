@@ -1,9 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import splashback as sp
-from scipy.stats import spearmanr
-import stacking_3D as s3d
 import determine_radius as dr
+
+H0 = 67.77 * 1000 / 3.09e22
+G = 6.67e-11
+rho_crit = 3 * H0**2 / (8 * np.pi * G) #kg/m^3
+unit_converter = 1.99e30 / (3.09e22**3)
+rho_crit = rho_crit / unit_converter
 
 def bin_profiles(data, accretion_bins, mass_bins, energy_bins):
     """
@@ -20,7 +24,7 @@ def bin_profiles(data, accretion_bins, mass_bins, energy_bins):
     
     sp.stack_and_find_3D(data, "mass", mass_bins)
     sp.stack_and_find_3D(data, "energy", energy_bins)
-    sp.stack_fixed_test(data, "accretion", accretion_bins, dim="3D")
+    sp.stack_fixed(data, "accretion", accretion_bins, dim="3D")
     
     log_DM = getattr(data, "accretion_log_DM")
     log_gas = getattr(data, "accretion_log_gas")
@@ -149,10 +153,90 @@ def plot_correlations(sgas, sDM, accretion, quantity="R"):
     ax[2].set_xlabel("$S_{\\rm{gas}}$")
     ax[0].legend()
     plt.show()
+    
+def correlations_quartiles(stack, stack_bins, stack_mids, label):
+    
+    not_nan = np.where(np.isfinite(stack)==True)[0]
+    bins_sort = np.digitize(stack[not_nan], stack_bins)
+    N_bins = len(stack_bins) - 1
+    
+    stacked_data_DM = np.zeros((N_bins, N_rad))
+    upper_data_DM = np.zeros((N_bins, N_rad))
+    lower_data_DM = np.zeros((N_bins, N_rad))
+    stacked_data_gas = np.zeros((N_bins, N_rad))
+    upper_data_gas = np.zeros((N_bins, N_rad))
+    lower_data_gas = np.zeros((N_bins, N_rad))
+    
+    for i in range(N_bins):
+        bin_mask = np.where(bins_sort == i+1)[0]
+        for j in range(N_rad):
+            stacked_data_DM[i,j] = np.nanmedian(flm.DM_density_3D[not_nan,:][bin_mask,j])
+            upper_data_DM[i,j] = np.nanpercentile(flm.DM_density_3D[not_nan,:][bin_mask,j], 75)
+            lower_data_DM[i,j] = np.nanpercentile(flm.DM_density_3D[not_nan,:][bin_mask,j], 25)
+            stacked_data_gas[i,j] = np.nanmedian(flm.gas_density_3D[not_nan,:][bin_mask,j])
+            upper_data_gas[i,j] = np.nanpercentile(flm.gas_density_3D[not_nan,:][bin_mask,j], 75)
+            lower_data_gas[i,j] = np.nanpercentile(flm.gas_density_3D[not_nan,:][bin_mask,j], 25)
+            
+    stacked_DM = np.dstack((lower_data_DM, stacked_data_DM, upper_data_DM))
+    stacked_gas = np.dstack((lower_data_gas, stacked_data_gas, upper_data_gas))
+    
+    log_DM = np.zeros((N_bins, N_rad, 3))
+    log_gas = np.zeros((N_bins, N_rad, 3))
+    R_DM = np.zeros((3,N_bins))
+    R_gas = np.zeros((3,N_bins))
+    depth_DM = np.zeros((3,N_bins))
+    depth_gas = np.zeros((3,N_bins))
+    for i in range(3):
+        log_DM[:,:,i] = sp.log_gradients(flm.rad_mid, stacked_DM[:,:,i])
+        log_gas[:,:,i] = sp.log_gradients(flm.rad_mid, stacked_gas[:,:,i])
+        R_DM[i,:], depth_DM[i,:] = dr.depth_cut(flm.rad_mid, log_DM[:,:,i], depth_value="y", cut=-1)  
+        R_gas[i,:], depth_gas[i,:] = dr.depth_cut(flm.rad_mid, log_gas[:,:,i], depth_value="y", cut=-1)  
+
+    R_error_bars_DM = np.sort(np.vstack((R_DM[0,:], R_DM[2,:])), axis=0) - R_DM[1,:]
+    R_error_bars_DM[0,:] = -R_error_bars_DM[0,:]
+    R_range_gas = np.vstack((R_gas[0,:], R_gas[2,:]))
+    R_error_bars_gas = np.sort(R_range_gas, axis=0) - R_gas[1,:]
+    R_error_bars_gas[0,:] = -R_error_bars_gas[0,:]
+    
+    y_error_bars_DM = np.vstack((depth_DM[1,:]-depth_DM[0,:], 
+                                 depth_DM[2,:]-depth_DM[1,:]))
+    y_error_bars_gas = np.vstack((depth_gas[1,:]-depth_gas[0,:], 
+                                 depth_gas[2,:]-depth_gas[1,:]))
+        
+    for i in range(N_bins):
+        plt.figure()
+        plt.semilogx(rad_mid, log_DM[i,:,1], color="k")
+        plt.fill_between(rad_mid, log_DM[i,:,0], log_DM[i,:,2])
+        plt.title(i)
+        plt.ylim((-5, 0.5))
+        plt.show()
+        
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    ax.errorbar(stack_mids, flm.R_DM_sphericity_gas,
+                   yerr=R_error_bars_DM,
+                   marker="o", color="darkorchid", capsize=2)
+    ax.errorbar(stack_mids, flm.R_gas_sphericity_gas,
+                yerr=R_error_bars_gas,
+                marker="^", color="c", capsize=2)
+    plt.xlabel(label)
+    plt.ylabel("$R_{\\rm{SP}}$")
+    plt.show()
+    
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    ax.errorbar(stack_mids, flm.depth_DM_sphericity_gas,
+                   yerr=y_error_bars_DM,
+                   marker="o", color="darkorchid", capsize=2)
+    ax.errorbar(stack_mids, flm.depth_gas_sphericity_gas,
+                yerr=y_error_bars_gas,
+                marker="^", color="c", capsize=2)
+    plt.xlabel(label)
+    plt.ylabel("$\gamma_{\\rm{SP}}$")
+    plt.show()
+    
+
 
 box = "L1000N1800"
 run = "HF"
-
 N_rad = 44
 log_radii = np.linspace(-1, 0.7, N_rad+1)
 rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
@@ -162,11 +246,11 @@ flm.sphericity_gas = np.genfromtxt(flm.path + "_sphericity_gas.csv",
 flm.sphericity_DM = np.genfromtxt(flm.path + "_sphericity_DM.csv",
                                 delimiter=",")
 
-plt.hist(flm.sphericity_gas, bins=50)
-plt.show()
+# plt.hist(flm.sphericity_gas, bins=50)
+# plt.show()
 
-plt.hist(flm.sphericity_DM, bins=50)
-plt.show()
+# plt.hist(flm.sphericity_DM, bins=50)
+# plt.show()
 
 flm.read_properties()
 N_bins = 15
@@ -175,14 +259,10 @@ mass_bins = np.append(mass_bins, 16)
 accretion_bins = np.linspace(0, 4, N_bins+1)
 accretion_bins = np.append(accretion_bins, 20)
 energy_bins = np.linspace(0.1, 0.3, N_bins+1)
-sgas_bins = np.linspace(0.5,1, N_bins+1)
+sgas_bins = np.linspace(0.5,0.95, N_bins+1)
 sgas_bins = np.append(0, sgas_bins)
-sDM_bins = np.linspace(0.3, 0.9, N_bins+1)
+sDM_bins = np.linspace(0.3, 0.85, N_bins+1)
 sDM_bins = np.append(0, sDM_bins)
-# print(sgas_bins)
-# percentiles = np.linspace(1,99,N_bins+1)
-# sgas_bins = np.nanpercentile(flm.sphericity_gas, percentiles)
-# sDM_bins = np.nanpercentile(flm.sphericity_DM, percentiles)
 
 sgas_mid = np.zeros(N_bins+1)
 sgas_mid[0] = sgas_bins[1]
@@ -197,17 +277,30 @@ acc_mid[:-1] = (accretion_bins[1:-1] + accretion_bins[:-2]) / 2
 bin_profiles(flm, accretion_bins, mass_bins, energy_bins)
 sp.stack_and_find_3D(flm, "sphericity_gas", sgas_bins)
 sp.stack_and_find_3D(flm, "sphericity_DM", sDM_bins)
+
 plot_profiles_compare_bins(flm, accretion_bins, sgas_bins, sDM_bins, 
                             quantity="DM")
 plot_profiles_compare_bins(flm, accretion_bins, sgas_bins, sDM_bins, 
                             quantity="gas")
 
-plot_correlations(sgas_mid, sDM_mid, acc_mid)
-plot_correlations(sgas_mid, sDM_mid, acc_mid, quantity="depth")
+# plot_correlations(sgas_mid, sDM_mid, acc_mid)
+# plot_correlations(sgas_mid, sDM_mid, acc_mid, quantity="depth")
+correlations_quartiles(flm.sphericity_gas, sgas_bins, sgas_mid, "$S_{\\rm{gas}}$")
+correlations_quartiles(flm.sphericity_DM, sDM_bins, sDM_mid, "$S_{\\rm{DM}}$")
+# correlations_quartiles(flm.accretion, accretion_bins, acc_mid, "$\Gamma$")
 
-# test_mask = np.where(flm.sphericity_gas < 0.8)[0]
-# # test_profiles = flm.DM_density_3D[test_mask, :]
+# plt.figure()
+# plt.semilogx(rad_mid, flm.sphericity_DM_log_DM[12,:])
+# plt.semilogx(rad_mid, flm.sphericity_DM_log_DM[13,:])
+# plt.semilogx(rad_mid, flm.sphericity_DM_log_DM[14,:])
+# plt.show()
 
-# for i in test_mask:
-#     plt.loglog(rad_mid, flm.DM_density_3D[i,:])
-#     plt.show()
+# plt.figure()
+# plt.loglog(rad_mid, flm.sphericity_DM_density_DM[12,:]/rho_crit)
+# plt.loglog(rad_mid, flm.sphericity_DM_density_DM[13,:]/rho_crit)
+# plt.loglog(rad_mid, flm.sphericity_DM_density_DM[14,:]/rho_crit)
+# plt.show()
+
+# for i in range(N_bins):
+#     plt.loglog(rad_mid, flm.sphericity_DM_density_DM[i,:]/rho_crit)
+# plt.show()
