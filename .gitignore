@@ -1,7 +1,7 @@
 
 # Sub directories
-old_code/
 plots/
+old_code/
 splashback_data/
 __pycache__/
 .ipynb_checkpoints/
