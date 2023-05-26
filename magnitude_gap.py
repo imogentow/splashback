@@ -2,7 +2,7 @@ import splashback as sp
 import numpy as np
 import matplotlib.pyplot as plt
 
-box = "L2800N5040"
+box = "L1000N1800"
 flm = sp.flamingo(box, "HF")
 flm.read_properties()
 # mass_mask = np.where(flm.M200m < 10**14.5)[0]
@@ -47,4 +47,6 @@ print(np.corrcoef(flm.accretion[mask2], gap2[mask2]))
 print(np.corrcoef(flm.accretion[mask4], gap4[mask4]))
 
 plt.scatter(flm.accretion, gap4)
+plt.xlabel("$\Gamma$")
+plt.ylabel("M14")
 plt.show()
