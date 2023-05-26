@@ -140,10 +140,10 @@ def stack_fixed(data, split, split_bins, dim="3D"):
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
     stacked_data = np.zeros((N_bins, data.N_rad, N_profiles))
-    print("")
+    # print("")
     for i in range(N_bins):
         bin_mask = np.where(bins_sort == i+1)[0]
-        print(len(bin_mask))
+        # print(len(bin_mask))
         for j in range(N_profiles):
             stacked_data[i,:,j] = stack_data(stacking_data[not_nan,:,j][bin_mask,:])
             
