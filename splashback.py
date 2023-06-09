@@ -39,9 +39,11 @@ class flamingo:
         self.log_radii = np.linspace(-1, 0.7, self.N_rad+1)
         self.rad_mid = (10**self.log_radii[1:] + 10**self.log_radii[:-1]) / 2
     
-    def read_extra_3D(self):
+    def read_pressure(self):
         self.gas_pressure_3D = np.genfromtxt(self.path + "_3D_gas_pressure_all.csv", 
                                            delimiter=",")
+        
+    def read_entropy(self):
         self.gas_entropy_3D = np.genfromtxt(self.path + "_3D_gas_entropy_all.csv", 
                                            delimiter=",")
         
@@ -122,13 +124,38 @@ def stack_fixed(data, split, split_bins, dim="3D"):
         split_data = np.log10(data.M200m)
     else:
         split_data = getattr(data, split)
+        
     if dim == "3D":
-        stacking_data = np.dstack((data.DM_density_3D, data.gas_density_3D))
+        pressure = hasattr(data, 'gas_pressure_3D')
+        entropy = hasattr(data, 'gas_entropy_3D')
+        if pressure and not entropy:
+            stacking_data = np.dstack((data.DM_density_3D, 
+                                       data.gas_density_3D,
+                                       data.gas_pressure_3D))
+            N_profiles = 3
+            saving_strings = ["_DM", "_gas", "_P"]
+        elif entropy and not pressure:
+            stacking_data = np.dstack((data.DM_density_3D, 
+                                       data.gas_density_3D,
+                                       data.gas_entropy_3D))
+            N_profiles = 3
+            saving_strings = ["_DM", "_gas", "_K"]
+        elif pressure and entropy:
+            stacking_data = np.dstack((data.DM_density_3D, 
+                                       data.gas_density_3D,
+                                       data.gas_pressure_3D,
+                                       data.gas_entropy_3D))
+            N_profiles = 4
+            saving_strings = ["_DM", "_gas", "_P", "_K"]
+        else:
+            stacking_data = np.dstack((data.DM_density_3D, data.gas_density_3D))
+            N_profiles = 2
+            saving_strings = ["_DM", "_gas"]
+        
         if len(split_data) > stacking_data.shape[0]:
             stacking_data = np.vstack((stacking_data, stacking_data,
                                        stacking_data))
-        N_profiles = 2
-        saving_strings = ["_DM", "_gas"]
+            
     elif dim == "2D":
         stacking_data = np.dstack((data.EM_median, data.SZ_median,
                                    data.WL_median))
@@ -140,16 +167,16 @@ def stack_fixed(data, split, split_bins, dim="3D"):
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
     stacked_data = np.zeros((N_bins, data.N_rad, N_profiles))
-    # print("")
+    print("")
     for i in range(N_bins):
         bin_mask = np.where(bins_sort == i+1)[0]
-        # print(len(bin_mask))
+        print(len(bin_mask))
         for j in range(N_profiles):
             stacked_data[i,:,j] = stack_data(stacking_data[not_nan,:,j][bin_mask,:])
             
     for i in range(N_profiles):
         log = log_gradients(data.rad_mid, stacked_data[:,:,i])
-        setattr(data, split+ "_density" + saving_strings[i], stacked_data[:,:,i])
+        setattr(data, split+ "_profile" + saving_strings[i], stacked_data[:,:,i]) #previously density instead of profile
         setattr(data, split+ "_log" + saving_strings[i], log)
     
     
@@ -170,9 +197,10 @@ def stack_and_find_3D(data, split, split_bins):
         Name of stacking criteria.
     split_bins : numpy array
         Bins to use to split stacking criteria.
-
     """
-    # stack_3D_fixed(data, split, split_bins)
+    pressure = hasattr(data, 'gas_pressure_3D')
+    entropy = hasattr(data, 'gas_entropy_3D')
+    
     stack_fixed(data, split, split_bins)
     log_DM = getattr(data, split+"_log_DM")
     log_gas = getattr(data, split+"_log_gas")
@@ -182,6 +210,29 @@ def stack_and_find_3D(data, split, split_bins):
                                                               depth_value="y",
                                                               second_caustic="y")
     R_SP_gas, depth_gas = dr.depth_cut(data.rad_mid, log_gas, cut=-2.5, depth_value="y")
+    if pressure:
+        log_P = getattr(data, split+"_log_P")
+        R_SP_P, second_P, depth_P, depth_second = dr.depth_cut(data.rad_mid, 
+                                                              log_P, 
+                                                              cut=-2.5,
+                                                              depth_value="y",
+                                                              second_caustic="y")
+        setattr(data, "R_P_"+split, R_SP_P)
+        setattr(data, "2_P_"+split, second_P)
+        setattr(data, "depth_P_"+split, depth_P)
+        
+    if entropy:
+        log_K = getattr(data, split+"_log_K")
+        R_SP_K, second_K, depth_K, depth_second = dr.depth_cut(data.rad_mid, 
+                                                              log_K, 
+                                                              cut=0.5,
+                                                              depth_value="y",
+                                                              second_caustic="y")
+        setattr(data, "R_K_"+split, R_SP_K)
+        setattr(data, "2_K_"+split, second_K)
+        setattr(data, "depth_K_"+split, depth_K)
+    
+    
     setattr(data, "R_DM_"+split, R_SP_DM)
     setattr(data, "2_DM_"+split, second_DM)
     setattr(data, "R_gas_"+split, R_SP_gas)
