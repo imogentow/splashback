@@ -13,6 +13,19 @@ rho_crit = 3 * H0**2 / (8 * np.pi * G) #kg/m^3
 unit_converter = 1.99e30 / (3.09e22**3)
 rho_crit = rho_crit / unit_converter
 
+def simple_density(radii, popt):
+    N_rad = len(radii)
+    density = np.zeros((N_bins, N_rad))
+    for i in range(N_bins):
+        params = popt[i,:]
+        rho_s = 10**params[0]
+        rho_m = 0.307 * rho_crit
+        rho_inner = rho_s * np.exp(-2/params[3] * ((radii/params[1])**params[3] - 1))
+        f_trans = (1 + (radii/params[2])**params[4])**(-params[5]/params[4])
+        rho_outer = rho_m * (params[6] * (radii/5)**(-1*params[7]) + 1)
+        density[i,:] = rho_inner * f_trans + rho_outer
+    return density
+
 def density_model(log_radii, rho_s, r_s, r_t, alpha, beta, gamma, b_e, S_e):
     """
     Density model from O'Neil et al 2021
@@ -129,7 +142,7 @@ def stack_profiles(N_bins):
     
 def fit_models(split):
     params = np.zeros((N_bins, 8))
-    profile = getattr(flm, split+"_density_DM")
+    profile = getattr(flm, split+"_profile_DM")
     for i in range(N_bins):
         guess = np.array([1, 0.15, 1.5, 0.06, 6, 84, 1.5, 0.9], dtype=np.float32)
         guess[0] = np.log10(profile[i,0]*100)
@@ -143,7 +156,7 @@ def fit_models(split):
         # test_data2 = density_model(np.log10(rad_mid), popt[0], popt[1], 
         #                           popt[2], popt[3], popt[4],
         #                           popt[5], popt[6], popt[7])
-        # plt.loglog(rad_mid, flm.accretion_density_DM[i,:]/rho_crit, label="True")
+        # plt.loglog(rad_mid, flm.accretion_profile_DM[i,:]/rho_crit, label="True")
         # #plt.loglog(rad_mid, 10**test_data, label="Test")
         # plt.loglog(rad_mid, 10**test_data2/rho_crit, label="Fit", linestyle="--")
         # plt.legend()
@@ -153,10 +166,10 @@ def fit_models(split):
 
 def fit_log_models(split):
     params = np.zeros((N_bins, 8))
-    profile = getattr(flm, split+"_density_DM")
-    log_profile = getattr(flm, split+"_log_DM")
+    profile = getattr(flm, split+"_profile_DM")#[:,25:]
+    log_profile = getattr(flm, split+"_log_DM")#[:,25:]
+    guess = np.array([1, 0.15, 1.5, 0.06, 6, 84, 1.5, 0.9], dtype=np.float32)
     for i in range(N_bins):
-        guess = np.array([1, 0.15, 1.5, 0.06, 6, 84, 1.5, 0.9], dtype=np.float32)
         guess[0] = np.log10(profile[i,0]*100)
         popt, pcov = curve_fit(log_grad_model, np.log10(rad_mid), 
                                 log_profile[i,:],
@@ -168,7 +181,7 @@ def fit_log_models(split):
         # test_data2 = density_model(np.log10(rad_mid), popt[0], popt[1], 
         #                           popt[2], popt[3], popt[4],
         #                           popt[5], popt[6], popt[7])
-        # plt.loglog(rad_mid, flm.concentration_density_DM[i,:]/rho_crit, label="True")
+        # plt.loglog(rad_mid, flm.concentration_profile_DM[i,:]/rho_crit, label="True")
         #plt.loglog(rad_mid, 10**test_data, label="Test")
         # plt.loglog(rad_mid, 10**test_data2/rho_crit, label="Fit", linestyle="--")
         # plt.legend()
@@ -190,9 +203,10 @@ def project_model(params):
     return projected_density
 
 
-def find_sort_R(array):
+def find_sort_R(array, plot="n"):
     R_sp, second = dr.depth_cut(rad_mid, array,
-                                cut=-1, second_caustic="y")
+                                cut=-1, second_caustic="y", 
+                                plot=plot)
     second_mask = np.where(np.isfinite(second))[0]
     for i in range(len(second_mask)):
         index = second_mask[i]
@@ -205,7 +219,7 @@ def find_sort_R(array):
 
 
 def plot_projection(params, projected_density, split, R_sp_model, R_sp_2D):
-    profile_3D = getattr(flm, split+"_density_DM")
+    profile_3D = getattr(flm, split+"_profile_DM")
     profile_2D = getattr(flm, split+"_density_DM_2D")
     log_3D = getattr(flm, split+"_log_DM")
     log_2D = getattr(flm, split+"_log_DM_2D")
@@ -214,11 +228,8 @@ def plot_projection(params, projected_density, split, R_sp_model, R_sp_2D):
         fit_3D = 10**density_model(np.log10(rad_mid), popt[0], popt[1], 
                                    popt[2], popt[3], popt[4],
                                    popt[5], popt[6], popt[7])
-        #log_fit_3D = np.gradient(fit_3D, np.log10(rad_mid))
-        log_fit_3D = log_grad_model(np.log10(rad_mid), popt[0], popt[1], 
-                               popt[2], popt[3], popt[4],
-                               popt[5], popt[6], popt[7])
-        # fit_2D = projected_density_model(np.log10(rad_mid), popt[0], popt[1], 
+        log_fit_3D = np.gradient(np.log10(fit_3D), np.log10(rad_mid))
+        # log_fit_3D = log_grad_model(np.log10(rad_mid), popt[0], popt[1], 
         #                        popt[2], popt[3], popt[4],
         #                        popt[5], popt[6], popt[7])
         log_fit_2D = np.gradient(np.log10(projected_density[i,:]), np.log10(rad_mid))
@@ -272,22 +283,44 @@ def plot_projection(params, projected_density, split, R_sp_model, R_sp_2D):
 
 def compare_quantities(stack):
     params = fit_log_models(stack)
-    projected_density = project_model(params)
-    projected_model_log_DM = sp.log_gradients(rad_mid, projected_density)
+    r_model = np.logspace(-1, 0.7, 100)
+    model_density = simple_density(r_model, params)
+    projected_model_density = project_model(params)
+    
+    projected_model_log_DM = np.zeros((N_bins, N_rad))
+    model_log_DM = np.zeros((N_bins, 100))
+    for i in range(N_bins):
+        model_log_DM[i,:] = np.gradient(np.log10(model_density[i,:]), np.log10(r_model)) 
+        projected_model_log_DM[i,:] = np.gradient(np.log10(projected_model_density[i,:]), 
+                                             np.log10(rad_mid))
+    
     #Projected splashback model from 3D
-    R_sp_model = find_sort_R(projected_model_log_DM)
+    R_sp_model_2D = find_sort_R(projected_model_log_DM)
+    R_sp_model_3D = find_sort_R(model_log_DM)
     #Splashback feature in 2D from DM
     R_sp_2D = find_sort_R(getattr(flm, stack+"_log_DM_2D"))
     #"True" splashback radius
     R_sp_3D = find_sort_R(getattr(flm, stack+"_log_DM")) 
     
-    plot_projection(params, projected_density, stack, R_sp_model, R_sp_2D)
-    print(params)
+    plot_projection(params, projected_model_density, stack, R_sp_model_3D, R_sp_3D)
     
     #Compare the splashback from 2D profiles with projected model
     plt.figure()
     cm = plt.cm.get_cmap('autumn')
-    plt.scatter(R_sp_2D, R_sp_model, edgecolor="k", 
+    plt.scatter(R_sp_2D, R_sp_model_2D, edgecolor="k", 
+                c=flm.mids[0,:], cmap=cm)
+    xlim = (0.7,1.62)
+    ylim = plt.gca().get_ylim()
+    plt.plot(xlim, xlim, color="k", alpha=0.6, linestyle="--")
+    plt.xlim(xlim)
+    plt.ylim(ylim)
+    plt.xlabel(r"$R_{\rm{SP, data}}/R_{\rm{200m}}$")
+    plt.ylabel(r"$R_{\rm{SP, model}} /R_{\rm{200m}}$")
+    plt.show()
+    
+    plt.figure()
+    cm = plt.cm.get_cmap('autumn')
+    plt.scatter(R_sp_3D, R_sp_model_3D, edgecolor="k", 
                 c=flm.mids[0,:], cmap=cm)
     xlim = (0.7,1.62)
     ylim = plt.gca().get_ylim()
@@ -485,8 +518,8 @@ if __name__ == "__main__":
                                       delimiter=",")
     N_bins = 10
     stack_profiles(N_bins)
-    # compare_quantities("accretion")
-    compare_quantities("mass")
+    compare_quantities("accretion")
+    # compare_quantities("mass")
     # compare_quantities("energy")
     # compare_quantities("concentration")
     # compare_quantities("symmetry")
