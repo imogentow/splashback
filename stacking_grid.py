@@ -6,8 +6,14 @@ from scipy.stats import binned_statistic_2d as bin2d
 
 plt.style.use("mnras.mplstyle")
     
+labels = {
+    "mass": "$\log M_{\\rm{200m}}$",
+    "concentration": "$c$",
+    "symmetry": "$s$",
+    "alignment": "$a$",
+    "centroid": "$\log\langle w \\rangle$"}
     
-def stack_grid_bins(data, mass_bins, accretion_bins):
+def stack_grid_bins(data, quantity1, quantity2):
     """
     For a given set of bins. Stack the DM and gas density profiles for a 
     given run according to a given stacking criteria. Assigns values with
@@ -18,19 +24,31 @@ def stack_grid_bins(data, mass_bins, accretion_bins):
     mass_bins: mass bins to use
     accretion_bins: mass bins to use
     """
-    not_nan = np.where((np.isfinite(data.M200m)==True) &
-                       (np.isfinite(data.accretion)==True))[0]
-    mass_values = np.log10(data.M200m[not_nan])
-    accretion_values = data.accretion[not_nan]
+    bins1 = getattr(data, quantity1+"_bins")
+    bins2 = getattr(data, quantity2+"_bins")
+    if quantity1 == "mass":
+        quantity1 = "M200m"
+        property1 = getattr(data, quantity1)
+        property1 = np.log10(property1)
+    else:
+        property1 = getattr(data, quantity1)
+    property2 = getattr(data, quantity2)
+    if len(property1) > len(property2):
+        property2 = np.hstack((property2, property2, property2))
 
-    binning = bin2d(mass_values, accretion_values, None, 'count',
-                      bins=[mass_bins, accretion_bins],
+    not_nan = np.where((np.isfinite(property1)==True) &
+                       (np.isfinite(property2)==True))[0]
+    values1 = property1[not_nan]
+    values2 = property2[not_nan]
+
+    binning = bin2d(values1, values2, None, 'count',
+                      bins=[bins1, bins2],
                       expand_binnumbers=True)
     bins_sort = binning.binnumber
     bin_counts = binning.statistic
     print(bin_counts)
-    N_mass = len(mass_bins) - 1 
-    N_acc = len(accretion_bins) - 1
+    N_mass = len(bins1) - 1 
+    N_acc = len(bins2) - 1
     
     stacked_DM = np.zeros((N_mass, N_acc, N_rad))
     stacked_gas = np.zeros((N_mass, N_acc, N_rad))
@@ -64,52 +82,79 @@ def stack_grid_bins(data, mass_bins, accretion_bins):
     data.depth_gas = depth_gas
     
 
-def grid_plot(data, mass_bins, accretion_bins):
+def grid_plot(data, quantity, accretion_bins):
+    bins = getattr(data, quantity+"_bins")
     N_acc = len(accretion_bins) - 1
-    N_mass = len(mass_bins) - 1
+    N_bins = len(bins) - 1
     fig, ax = plt.subplots(nrows=N_acc, ncols=1,
                            figsize=(3,6),
                            sharex=True, sharey=True,
                            gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    cm = plt.cm.copper(np.linspace(0,1,N_mass))
+    cm = plt.cm.copper(np.linspace(0,1,N_bins))
+    symbol = labels[quantity]
     for i in range(N_acc):
-        for j in range(N_mass):
-            if j == N_mass-1:
-                label = r"$M_{\rm{200m}} >$" + str(np.round(mass_bins[j],2))
-            else:
-                label = str(np.round(mass_bins[j],2)) \
-                + r"$< M_{\rm{200m}} <$" \
-                + str(np.round(mass_bins[j+1],2))
-            ax[i].semilogx(rad_mid, data.log_gas[j,i,:], 
+        for j in range(N_bins):
+            # if j == N_mass-1:
+            #     label = r"$M_{\rm{200m}} >$" + str(np.round(mass_bins[j],2))
+            # else:
+            label = str(np.round(bins[j],2)) \
+            + r"$<$" + symbol + "$<$" \
+            + str(np.round(bins[j+1],2))
+            ax[i].semilogx(rad_mid, data.log_DM[j,i,:], 
                            color=cm[j], linewidth=0.8,
                            label=label)
-        if i == N_acc-1:
-            plot_label = r"$\Gamma >$" + str(np.round(accretion_bins[i],2))
-        else:
-            plot_label = str(np.round(accretion_bins[i],2)) \
+        # if i == N_acc-1:
+        #     plot_label = r"$\Gamma >$" + str(np.round(accretion_bins[i],2))
+        # else:
+        plot_label = str(np.round(accretion_bins[i],2)) \
                         + r"$< \Gamma <$" \
                         + str(np.round(accretion_bins[i+1],2))
         ax[i].text(0.05, 0.05, plot_label, transform=ax[i].transAxes)
+    fig.text(0.02, 0.45, r"$d \log \rho_{\rm{DM}} / d \log r$",
+             transform=fig.transFigure, rotation='vertical')
+    plt.xlabel("$r/R_{\\rm{200m}}$")
     ax[0].legend()
+    plt.subplots_adjust(0.15)
+    # filename = "splashback_data/flamingo/plots/grid_stacking_Gamma_"+quantity+".png"
+    # plt.savefig(filename, dpi=300)
     plt.show()
     
 
-
-def stack_for_profiles():
-    N_mass = 7
-    N_acc = 4
-    mass_bins = np.linspace(13, 14.8, N_mass)
-    accretion_bins = np.linspace(0, 3, N_acc)
-    mass_bins = np.append(mass_bins, 16)
-    accretion_bins = np.append(accretion_bins,20)
+def stack_for_profiles(data):
+    N_bins = 5
+    data.mass_bins = np.linspace(14, 15.2, N_bins)
+    data.accretion_bins = np.linspace(0, 4, N_bins)
+    data.concentration_bins = np.linspace(0.0, 0.4, N_bins)
+    data.symmetry_bins = np.linspace(0.0, 1.5, N_bins) 
+    data.alignment_bins = np.linspace(0.4, 1.6, N_bins) 
+    data.centroid_bins = np.linspace(-3, -1, N_bins)
+ 
+    stack_grid_bins(data, "mass", "accretion")
+    grid_plot(data, "mass", data.accretion_bins)
     
-    stack_grid_bins(flm_HF, mass_bins, accretion_bins)
-    grid_plot(flm_HF, mass_bins, accretion_bins)
+    data.DM_density_3D = np.vstack((data.DM_density_3D, 
+                                    data.DM_density_3D, 
+                                    data.DM_density_3D))
+    data.gas_density_3D = np.vstack((data.gas_density_3D, 
+                                     data.gas_density_3D, 
+                                     data.gas_density_3D))
     
-    plt.figure()
-    for i in range(N_acc):
-        plt.semilogx(10**mass_bins[:-1], flm_HF.depth_gas[:,i], marker="o")
-    plt.show()
+    stack_grid_bins(data, "concentration", "accretion")
+    grid_plot(data, "concentration", data.accretion_bins)
+    
+    stack_grid_bins(data, "symmetry", "accretion")
+    grid_plot(data, "symmetry", data.accretion_bins)
+    
+    stack_grid_bins(data, "alignment", "accretion")
+    grid_plot(data, "alignment", data.accretion_bins)
+    
+    stack_grid_bins(data, "centroid", "accretion")
+    grid_plot(data, "centroid", data.accretion_bins)
+    
+    # plt.figure()
+    # for i in range(N_bins):
+    #     plt.semilogx(10**mass_bins[:-1], flm_HF.depth_gas[:,i], marker="o")
+    # plt.show()
     
 
 
@@ -122,6 +167,7 @@ if __name__ == "__main__":
     
     flm_HF = sp.flamingo(box, "HF")
     flm_HF.read_properties()
-    flm_HF.read_low_mass()
+    flm_HF.read_2D_properties()
+    # flm_HF.read_low_mass()
     
-    stack_for_profiles()
+    stack_for_profiles(flm_HF)
