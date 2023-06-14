@@ -20,13 +20,28 @@ names = {
     "HSJ": "HYDRO_STRONG_JETS",
     "HSS": "HYDRO_STRONG_SUPERNOVA",
     "DMO": "DARK_MATTER_ONLY"} 
+
+identifiers = {
+    "HF": "L1_m9",
+    "HWA": "fgas+2$\sigma$",
+    "HSA": "fgas-2$\sigma$",
+    "HTA": "fgas-4$\sigma$",
+    "HUA": "fgas-8$\sigma$",
+    "HP": "Planck",
+    "HPV": "PlanckNu0p24Var",
+    "HPF": "PlanckNu0p24Fix",
+    "HJ": "Jet",
+    "HSJ": "Jet_fgas-4$\sigma$",
+    "HSS": "M*-1$\sigma$",
+    "DMO": "L1_m9_DMO"} #assumes 1Gpc box
+
 class flamingo:
     """Read flamingo data"""
     def __init__(self, box, run):
         #3D profiles
         self.box = box
         self.run = run
-        self.run_label = names[self.run]
+        self.run_label = identifiers[self.run]
         self.path = PATH + "flamingo/" + box + "_" + run
         
         self.DM_density_3D = np.genfromtxt(self.path + "_3D_DM_density_all.csv", 
@@ -168,6 +183,8 @@ def stack_fixed(data, split, split_bins, dim="3D"):
     N_bins = len(split_bins) - 1
     stacked_data = np.zeros((N_bins, data.N_rad, N_profiles))
     print("")
+    print(names[data.run])
+    print(split)
     for i in range(N_bins):
         bin_mask = np.where(bins_sort == i+1)[0]
         print(len(bin_mask))
