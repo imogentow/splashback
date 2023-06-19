@@ -1,9 +1,9 @@
-"""Read main data and do most common calculations. E.g. finding splashback
-radius and stacking data"""
+"""Read main data and do most common calculations."""
 
 import numpy as np
 from math import factorial
 import determine_radius as dr
+from scipy.signal import savgol_filter
 
 PATH = "splashback_data/"
        
@@ -36,8 +36,8 @@ identifiers = {
     "DMO": "L1_m9_DMO"} #assumes 1Gpc box
 
 class flamingo:
-    """Read flamingo data"""
     def __init__(self, box, run):
+        """Read in key 3D profiles and define radii used to produce profiles."""
         #3D profiles
         self.box = box
         self.run = run
@@ -71,14 +71,17 @@ class flamingo:
                                        delimiter=",")
         
     def read_2D_properties(self):
+        """Reads in 2D morphology criteria obtained from projected emission
+        maps of flamingo clusters."""
         morph = np.genfromtxt(self.path + "_morphology_criteria_all.csv",
                               delimiter=",")
         self.concentration = morph[:,0]
         self.symmetry = morph[:,1]
         self.alignment = morph[:,2]
-        self.centroid = np.log10(morph[:,3]) #logged to give even distribution
+        self.centroid = np.log10(morph[:,3]) #logged to give more even distribution
         
     def read_properties(self):
+        """Get general halo properties."""
         accretion = np.genfromtxt(self.path 
                                   + "_accretion.csv",
                                   delimiter=",")
@@ -95,7 +98,8 @@ class flamingo:
         
         
     def read_low_mass(self):
-        """Read low mass data when needed to save memory"""
+        """Read low mass data when needed to save memory. Adds it to already
+        existing variables."""
         DM_density_3D_low = np.genfromtxt(self.path + "_3D_DM_density_low_mass_all.csv", 
                                           delimiter=",") #1e10Msol / (r/R200m)^3
         if self.run != "DMO":
@@ -182,12 +186,12 @@ def stack_fixed(data, split, split_bins, dim="3D"):
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
     stacked_data = np.zeros((N_bins, data.N_rad, N_profiles))
-    print("")
-    print(names[data.run])
-    print(split)
+    # print("")
+    # print(names[data.run])
+    # print(split)
     for i in range(N_bins):
         bin_mask = np.where(bins_sort == i+1)[0]
-        print(len(bin_mask))
+        # print(len(bin_mask))
         for j in range(N_profiles):
             stacked_data[i,:,j] = stack_data(stacking_data[not_nan,:,j][bin_mask,:])
             
@@ -299,42 +303,49 @@ def stack_and_find_2D(data, split, split_bins):
     
 
 def stack_data(array):
-    """Stacks data.
-    array - 2D array, each row a cluster, each column a rad bin
-    
-    returns 
-    profile - 1D array, same number of rad bins as above"""
+    """
+    Stacks data. Calculates the median value in each radial bin.
+
+    Parameters
+    ----------
+    array : 2D numpy array
+    Each row a cluster, each column a rad bin. Data to stack.
+
+    Returns
+    -------
+    profile : 1D numpy array
+    Same number of rad bins as above. Stacked data.
+
+    """
     N_bins = np.shape(array)[1]
     profile = np.zeros(N_bins)
     for i in range(N_bins):
         profile[i] = np.nanmedian(array[:,i])
     return profile
 
-    
-def savitzky_golay(y, window_size, order, deriv=0, rate=1):
-    try:
-        window_size = np.abs(int(window_size))
-        order = np.abs(int(order))
-    except ValueError:
-        raise ValueError("window_size and order have to be of type int")
-    if window_size % 2 != 1 or window_size < 1:
-        raise TypeError("window_size size must be a positive odd number")
-    if window_size < order + 2:
-        raise TypeError("window_size is too small for the polynomials order")
-    order_range = range(order+1)
-    half_window = (window_size -1) // 2
-    # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
-    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
-    # pad the signal at the extremes with
-    # values taken from the signal itself
-    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
-    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
-    y = np.concatenate((firstvals, y, lastvals))
-    return np.convolve( m[::-1], y, mode='valid')
-
 
 def log_gradients(radii, array, window=19, order=4):
+    """
+    Takes profile, calculates the gradient and then smoothes using a 
+    Savitzky-Golay filter.
+
+    Parameters
+    ----------
+    radii : 1D numpy array 
+        Radii corresponsing to array. (N_rad)
+    array : 1 or 2D numpy array, 
+        Profile(s) to convert.(NxN_rad)
+    window : int, optional
+        window size for Sav-Gol filter. The default is 19.
+    order : int, optional
+        Polynomial order for Sav-Gol filter. The default is 4.
+
+    Returns
+    -------
+    smoothed_array : 1 or 2D numpy array 
+        Smoothed, gradient profiles. (NxN_rad)
+
+    """
     if array.ndim != 1:
         N = array.shape[0]
     else:
@@ -350,8 +361,7 @@ def log_gradients(radii, array, window=19, order=4):
         temp_radii = radii[finite]
         
         dlnrho_dlnr = np.gradient(np.log10(density), np.log10(temp_radii)) 
-        smoothed_array[i,finite] = savitzky_golay(dlnrho_dlnr, window_size=window,
-                                              order=order)
+        smoothed_array[i,finite] = savgol_filter(dlnrho_dlnr, window, order)
     if N == 1:
         smoothed_array = smoothed_array.flatten()
         
