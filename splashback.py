@@ -62,6 +62,14 @@ class flamingo:
         self.gas_entropy_3D = np.genfromtxt(self.path + "_3D_gas_entropy_all.csv", 
                                            delimiter=",")
         
+    def read_temperature(self):
+        self.gas_temperature_3D = np.genfromtxt(self.path + "_3D_gas_temperature_all.csv", 
+                                                delimiter=",")
+        
+    def read_velocity(self):
+        self.gas_velocity_3D = -1*np.genfromtxt(self.path + "_3D_gas_velocity_all.csv", 
+                                             delimiter=",")
+        
     def read_2D(self):
         self.EM_median = np.genfromtxt(self.path + "_EM_profiles_all.csv",
                                        delimiter=",")
@@ -107,6 +115,14 @@ class flamingo:
                                                delimiter=",")
             self.gas_density_3D = np.vstack((self.gas_density_3D, gas_density_3D_low))
             
+            gas_properties = np.genfromtxt(self.path + "_gas_properties_low_mass_all.csv",
+                                            delimiter=",")
+            energy = gas_properties[:,2]
+            hot_gas_fraction = gas_properties[:,1]
+            baryon_fraction = gas_properties[:,0]
+            self.energy = np.hstack((self.energy, energy))
+            self.hot_gas_fraction = np.hstack((self.hot_gas_fraction, hot_gas_fraction))
+            self.baryon_fraction = np.hstack((self.baryon_fraction, baryon_fraction))
         M200m_low = np.genfromtxt(self.path + "_M200m_low_mass.csv",
                                   delimiter=",")
         accretion_low = np.genfromtxt(self.path + "_accretion_low_mass.csv",
@@ -116,7 +132,7 @@ class flamingo:
         self.accretion = np.hstack((self.accretion, accretion_low))
         
 
-def stack_fixed(data, split, split_bins, dim="3D"):
+def stack_fixed(data, split, split_bins, dim="3D", bootstrap="none"):
     """
     For a given set of bins. Stack the DM and gas density profiles for a 
     given run according to a given stacking criteria. Assigns values with
@@ -147,30 +163,33 @@ def stack_fixed(data, split, split_bins, dim="3D"):
     if dim == "3D":
         pressure = hasattr(data, 'gas_pressure_3D')
         entropy = hasattr(data, 'gas_entropy_3D')
-        if pressure and not entropy:
-            stacking_data = np.dstack((data.DM_density_3D, 
-                                       data.gas_density_3D,
-                                       data.gas_pressure_3D))
-            N_profiles = 3
-            saving_strings = ["_DM", "_gas", "_P"]
-        elif entropy and not pressure:
-            stacking_data = np.dstack((data.DM_density_3D, 
-                                       data.gas_density_3D,
-                                       data.gas_entropy_3D))
-            N_profiles = 3
-            saving_strings = ["_DM", "_gas", "_K"]
-        elif pressure and entropy:
-            stacking_data = np.dstack((data.DM_density_3D, 
-                                       data.gas_density_3D,
-                                       data.gas_pressure_3D,
-                                       data.gas_entropy_3D))
-            N_profiles = 4
-            saving_strings = ["_DM", "_gas", "_P", "_K"]
-        else:
-            stacking_data = np.dstack((data.DM_density_3D, data.gas_density_3D))
-            N_profiles = 2
-            saving_strings = ["_DM", "_gas"]
+        temperature = hasattr(data, 'gas_temperature_3D')
+        velocity = hasattr(data, 'gas_velocity_3D')
         
+        stacking_data = np.dstack((data.DM_density_3D, data.gas_density_3D))
+        N_profiles = 2
+        saving_strings = ["_DM", "_gas"]
+        if pressure:
+            stacking_data = np.dstack((stacking_data,
+                                       data.gas_pressure_3D))
+            N_profiles += 1
+            saving_strings.append("_P")
+        if entropy :
+            stacking_data = np.dstack((stacking_data,
+                                       data.gas_entropy_3D))
+            N_profiles += 1
+            saving_strings.append("_K")
+        if temperature:
+            stacking_data = np.dstack((stacking_data,
+                                       data.gas_temperature_3D))
+            N_profiles += 1
+            saving_strings.append("_T")
+        if velocity:
+            stacking_data = np.dstack((stacking_data,
+                                       data.gas_velocity_3D))
+            N_profiles += 1
+            saving_strings.append("_v")
+            
         if len(split_data) > stacking_data.shape[0]:
             stacking_data = np.vstack((stacking_data, stacking_data,
                                        stacking_data))
@@ -200,9 +219,13 @@ def stack_fixed(data, split, split_bins, dim="3D"):
         setattr(data, split+ "_profile" + saving_strings[i], stacked_data[:,:,i]) #previously density instead of profile
         setattr(data, split+ "_log" + saving_strings[i], log)
     
+    if bootstrap != "none":
+        Rsp_error = bootstrap_errors(data, stacking_data, split_data, split_bins)
+        for i in range(N_profiles):
+            setattr(data, "error_R_" + split + saving_strings[i], Rsp_error[i,:])
     
 
-def stack_and_find_3D(data, split, split_bins):
+def stack_and_find_3D(data, split, split_bins, bootstrap="none"):
     """
     Stacks data using stack_3D_function. Uses new profiles to determine 
     splashback radius and depth of minima.
@@ -218,11 +241,14 @@ def stack_and_find_3D(data, split, split_bins):
         Name of stacking criteria.
     split_bins : numpy array
         Bins to use to split stacking criteria.
+    bootstrap : str
+        Whether or not to calculate bootstrap errors of Rsp.
     """
     pressure = hasattr(data, 'gas_pressure_3D')
     entropy = hasattr(data, 'gas_entropy_3D')
+    velocity = hasattr(data, 'gas_velocity_3D')
     
-    stack_fixed(data, split, split_bins)
+    stack_fixed(data, split, split_bins, bootstrap=bootstrap)
     log_DM = getattr(data, split+"_log_DM")
     log_gas = getattr(data, split+"_log_gas")
     R_SP_DM, second_DM, depth_DM, depth_second = dr.depth_cut(data.rad_mid, 
@@ -253,6 +279,12 @@ def stack_and_find_3D(data, split, split_bins):
         setattr(data, "2_K_"+split, second_K)
         setattr(data, "depth_K_"+split, depth_K)
     
+    if velocity:
+        log_v = getattr(data, split+"_log_v")
+        R_SP_v = dr.find_maxima(data.rad_mid, 
+                                log_v, 
+                                cut=0.5)
+        setattr(data, "R_v_"+split, R_SP_v)
     
     setattr(data, "R_DM_"+split, R_SP_DM)
     setattr(data, "2_DM_"+split, second_DM)
@@ -301,6 +333,29 @@ def stack_and_find_2D(data, split, split_bins):
     setattr(data, "R_WL_"+split, R_SP_WL)
     setattr(data, "depth_WL_"+split, depth_WL)
     
+
+def bootstrap_errors(data, stacking_data, split_data, split_bins, dim="3D"):
+    N_bootstrap = 1000
+    N_profiles = stacking_data.shape[2] #CHECK INDEX
+    not_nan = np.where(np.isfinite(split_data)==True)[0]
+    bins_sort = np.digitize(split_data[not_nan], split_bins)
+    N_bins = len(split_bins) - 1
+    Rsp_error = np.zeros((N_profiles, N_bins))
+    
+    for k in range(N_profiles):
+        for i in range(N_bins):
+            bin_mask = np.where(bins_sort == i+1)[0]
+            stacked_data = np.zeros((N_bootstrap, data.N_rad))
+            for j in range(N_bootstrap):
+                # Select random sample from bin with replacement
+                sample = np.random.choice(bin_mask, 
+                                          size=len(bin_mask),
+                                          replace=True)
+                stacked_data[j,:] = stack_data(stacking_data[not_nan[sample],:,k])
+            log_sample = log_gradients(data.rad_mid, stacked_data)
+            Rsp_sample = dr.depth_cut(data.rad_mid, log_sample)
+            Rsp_error[k,i] = np.nanstd(Rsp_sample)
+    return Rsp_error
 
 def stack_data(array):
     """
@@ -366,3 +421,5 @@ def log_gradients(radii, array, window=19, order=4):
         smoothed_array = smoothed_array.flatten()
         
     return smoothed_array
+
+
