@@ -41,6 +41,10 @@ def plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
         ylim = (-5,0.1)
     elif quantity == "K":
         ylim = (-0.5,1.5)
+    elif quantity == "T":
+        ylim = (-2, 0.5)
+    elif quantity == "v":
+        ylim = (-1.2, 2.1)
     fig, ax = plt.subplots(nrows=3, ncols=1, 
                            figsize=(3,6), 
                            sharey=True,
@@ -74,7 +78,7 @@ def plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
     ax[2].legend()
     ax[2].set_xlabel("$r/R_{\\rm{200m}}$")
     ax[1].set_ylabel(r"$d \log \rho_{{\rm{{{}}}}} / d \log r$".format(quantity))
-    # filename = "splashback_data/flamingo/plots/HF_compare_bins.png"
+    # filename = "splashback_data/flamingo/plots/HF_compare_bins_"+quantity+".png"
     # plt.savefig(filename, dpi=300)
     plt.show()
 
@@ -83,17 +87,10 @@ flm = sp.flamingo(box, "HF")
 flm.read_properties()
 flm.read_pressure()
 flm.read_entropy()
-flm.read_2D()
-# mass_mask = np.where(flm.M200m < 10**14.1)[0]
-# flm.gas_pressure_3D = flm.gas_pressure_3D[mass_mask,:]
-# flm.gas_entropy_3D = flm.gas_entropy_3D[mass_mask,:]
-# flm.gas_density_3D = flm.gas_density_3D[mass_mask,:]
-# flm.DM_density_3D = flm.DM_density_3D[mass_mask,:]
-# flm.accretion = flm.accretion[mass_mask]
-# flm.M200m = flm.M200m[mass_mask]
-# flm.energy = flm.energy[mass_mask]
+flm.read_temperature()
+flm.read_velocity()
 
-N_bins = 14
+N_bins = 10
 mass_bins = np.linspace(14, 15, N_bins+1)
 mass_bins = np.append(mass_bins, 16)
 accretion_bins = np.linspace(0, 4, N_bins+1)
@@ -114,102 +111,21 @@ sp.stack_and_find_3D(flm, "accretion", accretion_bins)
 sp.stack_and_find_3D(flm, "mass", mass_bins)
 sp.stack_and_find_3D(flm, "energy", energy_bins)
 
-sp.stack_and_find_2D(flm, "accretion", accretion_bins)
-sp.stack_and_find_2D(flm, "mass", mass_bins)
-sp.stack_and_find_2D(flm, "energy", energy_bins)
-
-cm_a = plt.cm.get_cmap('autumn')
-cm_m = plt.cm.get_cmap('winter')
-cm_e = plt.cm.get_cmap('copper')
-
-plt.figure()
-plt.scatter(flm.R_gas_accretion, flm.R_P_accretion, 
-            edgecolor="k", c=accretion_mid, cmap=cm_a,
-            marker="o")
-plt.scatter(flm.R_gas_mass, flm.R_P_mass, 
-            edgecolor="k", c=mass_mid, cmap=cm_m,
-            marker="*")
-plt.scatter(flm.R_gas_energy, flm.R_P_energy, 
-            edgecolor="k", c=energy_mid, cmap=cm_e,
-            marker="v")
-xlim = plt.gca().get_xlim()
-ylim = plt.gca().get_ylim()
-plt.plot(xlim, xlim, color="k", alpha=0.6, linestyle="--")
-plt.xlim(xlim)
-plt.ylim(ylim)
-plt.xlabel("$R_{\\rm{SP,}\\rho_{\\rm{gas}}}$")
-plt.ylabel("$R_{\\rm{SP,P}}$")
-plt.show()
-
-plt.figure()
-plt.scatter(flm.R_gas_accretion, flm.R_EM_accretion, 
-            edgecolor="k", c=accretion_mid, cmap=cm_a,
-            marker="o")
-plt.scatter(flm.R_gas_mass, flm.R_EM_mass, 
-            edgecolor="k", c=mass_mid, cmap=cm_m,
-            marker="*")
-plt.scatter(flm.R_gas_energy, flm.R_EM_energy, 
-            edgecolor="k", c=energy_mid, cmap=cm_e,
-            marker="v")
-xlim = plt.gca().get_xlim()
-ylim = plt.gca().get_ylim()
-plt.plot(xlim, xlim, color="k", alpha=0.6, linestyle="--")
-plt.xlim(xlim)
-plt.ylim(ylim)
-plt.xlabel("$R_{\\rm{SP,}\\rho_{\\rm{gas}}}$")
-plt.ylabel("$R_{\\rm{SP,EM}}$")
-plt.show()
-
-plt.figure()
-plt.scatter(flm.R_P_accretion, flm.R_SZ_accretion, 
-            edgecolor="k", c=accretion_mid, cmap=cm_a,
-            marker="o")
-plt.scatter(flm.R_P_mass, flm.R_SZ_mass, 
-            edgecolor="k", c=mass_mid, cmap=cm_m,
-            marker="*")
-plt.scatter(flm.R_P_energy, flm.R_SZ_energy, 
-            edgecolor="k", c=energy_mid, cmap=cm_e,
-            marker="v")
-xlim = plt.gca().get_xlim()
-ylim = plt.gca().get_ylim()
-plt.plot(xlim, xlim, color="k", alpha=0.6, linestyle="--")
-plt.xlim(xlim)
-plt.ylim(ylim)
-plt.xlabel("$R_{\\rm{SP,P}}$")
-plt.ylabel("$R_{\\rm{SP,SZ}}$")
-plt.show()
-
-plt.figure()
-plt.scatter(flm.R_K_accretion, flm.R_SZ_accretion, 
-            edgecolor="k", c=accretion_mid, cmap=cm_a,
-            marker="o")
-plt.scatter(flm.R_K_mass, flm.R_SZ_mass, 
-            edgecolor="k", c=mass_mid, cmap=cm_m,
-            marker="*")
-plt.scatter(flm.R_K_energy, flm.R_SZ_energy, 
-            edgecolor="k", c=energy_mid, cmap=cm_e,
-            marker="v")
-xlim = plt.gca().get_xlim()
-ylim = plt.gca().get_ylim()
-plt.plot(xlim, xlim, color="k", alpha=0.6, linestyle="--")
-plt.xlim(xlim)
-plt.ylim(ylim)
-plt.xlabel("$R_{\\rm{SP,K}}$")
-plt.ylabel("$R_{\\rm{SP,SZ}}$")
-plt.show()
 
 # plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
-#                                quantity="P")
+#                                 quantity="P")
 # plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
-#                                quantity="K")
+#                                 quantity="K")
+# plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
+#                                 quantity="T")
+# plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
+#                                 quantity="v")
 
-# mass_mask = np.where(flm.M200m > 1e15)[0]
-# log_P = sp.log_gradients(flm.rad_mid, flm.gas_pressure_3D[mass_mask])
-# for i in range(30):
-#     plt.figure()
-#     plt.semilogx(flm.rad_mid, log_P[i,:])
-#     ylim_lower = plt.gca().get_ylim()[0]
-#     ylim = (ylim_lower,0)
-#     plt.ylim(ylim)
-#     plt.title(i)
-#     plt.show()
+plt.scatter(mass_mid[:-1], flm.R_gas_mass[:-1], label="$\\rho_{\\rm{gas}}$")
+plt.scatter(mass_mid[:-1], flm.R_P_mass[:-1], label="$P$")
+plt.scatter(mass_mid[:-1], flm.R_v_mass[:-1], label="$v$")
+# plt.scatter(mass_mid[:-1], flm.R_K_mass[:-1], label="$K$")
+plt.legend(loc='lower left')
+plt.xlabel("$\log M_{\\rm200m}}$")
+plt.ylabel("$R/R_{\\rm{200m}}$")
+plt.show()
