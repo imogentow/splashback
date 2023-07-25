@@ -1,12 +1,11 @@
 import splashback as sp
 import numpy as np
 import matplotlib.pyplot as plt
-import determine_radius as dr
 import corner
 
 plt.style.use("mnras.mplstyle")
 
-box = "L2800N5040"
+box = "L1000N1800"
 flm = sp.flamingo(box, "HF")
 
 N_bins = 45
@@ -16,36 +15,47 @@ rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
 log_DM_density = sp.log_gradients(rad_mid, flm.DM_density_3D)
 log_gas_density = sp.log_gradients(rad_mid, flm.gas_density_3D)
 
-# Rsp_DM_3D = dr.standard(rad_mid, log_DM_density)
-# Rsp_gas_3D = dr.DM_prior_new(rad_mid, log_gas_density, Rsp_DM_3D)
-
 flm.read_properties()
+flm.read_2D_properties()
 
-flm.sphericity_gas = np.genfromtxt(flm.path + "_sphericity_gas.csv",
-                                delimiter=",")
-flm.sphericity_DM = np.genfromtxt(flm.path + "_sphericity_DM.csv",
-                                delimiter=",")
+N_clusters = len(flm.M200m)
+flm.concentration = flm.concentration[:N_clusters]
+flm.symmetry = flm.symmetry[:N_clusters]
+flm.alignment = flm.alignment[:N_clusters]
+flm.centroid = flm.centroid[:N_clusters]
 
-plot_data = np.vstack((np.log10(flm.M200m), flm.accretion, flm.energy,
-                       flm.sphericity_gas, flm.sphericity_DM)).T
-list_good = np.intersect1d(
-    np.intersect1d(np.intersect1d(np.where(np.isfinite(plot_data[:,0]))[0], np.where(np.isfinite(plot_data[:,1]))[0]),
-    np.intersect1d(np.where(np.isfinite(plot_data[:,2]))[0], np.where(np.isfinite(plot_data[:,3]))[0])),
-    np.where(np.isfinite(plot_data[:,4]))[0])
+magnitudes = np.genfromtxt(flm.path + "_galaxy_magnitudes.csv", delimiter=",")
+sorted_magnitudes = np.sort(magnitudes)
+mag_bcg = sorted_magnitudes[:,0]
+mag_fourth = sorted_magnitudes[:,2]
+flm.gap = mag_fourth - mag_bcg
 
-plot_data = plot_data[list_good]
+properties_all = np.vstack((np.log10(flm.M200m), flm.accretion, flm.energy, flm.gap,
+                       flm.concentration, flm.symmetry, flm.alignment, flm.centroid))
+list_good1 = np.intersect1d(
+    np.intersect1d(np.intersect1d(np.where(np.isfinite(properties_all[0,:]))[0], 
+                                  np.where(np.isfinite(properties_all[1,:]))[0]),
+    np.intersect1d(np.where(np.isfinite(properties_all[2,:]))[0], np.where(np.isfinite(properties_all[3,:]))[0])),
+    np.where(np.isfinite(properties_all[4,:]))[0])
+list_good2 = np.intersect1d(
+    np.intersect1d(np.where(np.isfinite(properties_all[5,:]))[0], 
+                                  np.where(np.isfinite(properties_all[6,:]))[0]),
+    np.where(np.isfinite(properties_all[7,:]))[0])
+list_good = np.intersect1d(list_good1, list_good2)
 
-fig, ax = plt.subplots(5,5, figsize=(5,5), dpi=300,
+plot_data = properties_all[:,list_good].T
+labels = [r'$\log M_{\rm{200m}}$', r'$\Gamma$', r'$E_{\rm{kin}}/E_{\rm{therm}}$',
+            '$M14$', '$c$', '$s$', '$a$', '$\log \langle w \\rangle$']
+N_properties = len(labels)
+
+fig, ax = plt.subplots(N_properties, N_properties, figsize=(6,6), dpi=300,
                        gridspec_kw={'hspace' : 0, 'wspace' : 0})
 fig.set_facecolor('w')
-from matplotlib.lines import Line2D
-
 fig= corner.corner(
     plot_data,
     fig=fig,
     plot_contours=True, plot_density=False, plot_datapoints=True,
-    labels=[r'$\log M_{\rm{200m}}$', r'$\Gamma$', r'$E_{\rm{kin}}/E_{\rm{therm}}$',
-            r'$S_{\rm{gas}}$', r'$S_{\rm{DM}}$'],
+    labels=labels,
     data_kwargs=dict(alpha=0.8, color='cornflowerblue'),
     hist_kwargs=dict(linewidth=0.8, color='cornflowerblue', histtype='stepfilled', density=True),
     hist2d_kwargs=dict(linewidth=0.8),
@@ -53,199 +63,70 @@ fig= corner.corner(
     contour_kwargs=dict(linewidths=0.7, colors='cornflowerblue'),
     contourf_kwargs=dict(colors=['w', '#ffd1a9', '#bcb1a5', '#7991a1', '#36729d']),
     max_n_ticks=3,
-    # quantiles=[0.16, 0.5, 0.84],
-    # show_titles=True,
     smooth=1.6,
-    # smooth1d=1.6,
     bins=40,
     hist_bin_factor=1,
-    fill_contours=False
-    # range=[(1, 2), 
-    #   (0, 3), 
-    #   (0, 0.5), 
-    #   (0, 0.45)],    
+    fill_contours=False  
 )
 
-for i in range(5):
+for i in range(N_properties):
     ax[i, i].yaxis.set_label_position('right')
     ax[i, i].yaxis.set_ticks_position('right')
-    #ax[i, 0].set_xscale('log')
-ax[0, 0].set_ylabel(r'$P(\log M_{\rm{200m}})$')
-ax[1, 1].set_ylabel(r'$P(\Gamma)$')
-ax[2, 2].set_ylabel(r'$P(E_{\rm{kin}}/E_{\rm{therm}})$')
-ax[3, 3].set_ylabel(r'$P(S_{\rm{gas}})$')
-ax[4, 4].set_ylabel(r'$P(S_{\rm{DM}})$')
+    ax[i, i].set_ylabel(r'$P(${}$)$'.format(labels[i]))
 
-# # Legend
-# handles=[
-#     Line2D([0], [0], label=r'0.2 $R_{500}$', color='cornflowerblue', ls='-'),
-#     Line2D([0], [0], label=r'$R_{500}$', color='grey', ls='-'),
-# ]
+M_lim = (14,15.55)
+Gamma_lim = (0,8)
+E_lim = (0,0.5)
+mag_lim = (0.0,3.5)
+c_lim =(0,0.6)
+s_lim = (0,1.6)
+a_lim = (0,2)
+w_lim = (-3, -1)
 
-ax[0, 0].legend(loc='upper right')
-ax[0,0].set_xlim((14.0,15.55))
-ax[1,0].set_xlim((14.0,15.55))
-ax[2,0].set_xlim((14.0,15.55))
-ax[3,0].set_xlim((14.0,15.55))
-ax[4,0].set_xlim((14.0,15.55))
+for i in range(N_properties):
+    ax[i,0].set_xlim(M_lim)
+    
+for i in range(N_properties-1):
+    ax[i+1,1].set_xlim(Gamma_lim)
+    ax[N_properties-1,i].set_ylim(w_lim)
 
-ax[1,1].set_xlim((0,8))
-ax[2,1].set_xlim((0,8))
-ax[3,1].set_xlim((0,8))
-ax[4,1].set_xlim((0,8))
+for i in range(N_properties-2):
+    ax[i+2,2].set_xlim(E_lim)
+    ax[N_properties-2,i].set_ylim(a_lim)
 
-ax[2,2].set_xlim((0,0.5))
-ax[3,2].set_xlim((0,0.5))
-ax[4,2].set_xlim((0,0.5))
+for i in range(N_properties-3):
+    ax[i+3,3].set_xlim(mag_lim)
+    ax[N_properties-3,i].set_ylim(s_lim)
 
-ax[3,3].set_xlim((0.21,0.99))
-ax[4,3].set_xlim((0.21,0.99))
+for i in range(N_properties-4):
+    ax[i+4,4].set_xlim(c_lim)
+    ax[N_properties-4,i].set_ylim(c_lim)
 
-#ax[4,4].set_xlim((0.09,0.15))
+# ax[4,4].set_xlim(c_lim)
+# ax[5,4].set_xlim(c_lim)
+# ax[6,4].set_xlim(c_lim)
+# ax[7,4].set_xlim(c_lim)
 
-ax[1,0].set_ylim((0,8))
+ax[5,5].set_xlim(s_lim)
+ax[6,5].set_xlim(s_lim)
+ax[7,5].set_xlim(s_lim)
 
-ax[2,0].set_ylim((0,0.5))
-ax[2,1].set_ylim((0,0.5))
+ax[6,6].set_xlim(a_lim)
+ax[7,6].set_xlim(a_lim)
 
-ax[3,0].set_ylim((0.21,0.99))
-ax[3,1].set_ylim((0.21,0.99))
-ax[3,2].set_ylim((0.21,0.99))
+ax[7,7].set_xlim(w_lim)
 
-#ax[4,0].set_ylim((0.09,0.15))
-#ax[4,1].set_ylim((0.09,0.15))
-#ax[4,2].set_ylim((0.09,0.15))
-#ax[4,3].set_ylim((0.09,0.15))
+ax[1,0].set_ylim(Gamma_lim)
 
+ax[2,0].set_ylim(E_lim)
+ax[2,1].set_ylim(E_lim)
+
+ax[3,0].set_ylim(mag_lim)
+ax[3,1].set_ylim(mag_lim)
+ax[3,2].set_ylim(mag_lim)
+
+plt.subplots_adjust(left=0.08, bottom=0.08)
 plt.savefig('splashback_data/flamingo/plots/cornerplot.png')
 plt.show()
 
 
-# fig, ax = plt.subplots(nrows=5, ncols=5, 
-#                        gridspec_kw={'hspace' : 0.1, 'wspace' : 0.1})
-
-# mass_range = (1e13,1e15)
-# energy_range = (0, 0.8)
-# acc_range = (0,5)
-# gas_range = (0.6,2.6)
-# DM_range = (0.6, 2.6)
-
-# ec = "k"
-# size = 5
-# lw=0.4
-
-# ax[4,0].scatter(Rsp_DM_3D, flm.M200m, edgecolor=ec, s=size, linewidth=lw)
-# ax[4,1].scatter(Rsp_gas_3D, flm.M200m, edgecolor=ec, s=size, linewidth=lw)
-# ax[4,2].scatter(flm.accretion, flm.M200m, edgecolor=ec, s=size, linewidth=lw)
-# ax[4,3].scatter(flm.energy, flm.M200m, edgecolor=ec, s=size, linewidth=lw)
-
-# ax[4,0].set_yscale('log')
-# ax[4,1].set_yscale('log')
-# ax[4,2].set_yscale('log')
-# ax[4,3].set_yscale('log')
-  
-# ax[3,0].scatter(Rsp_DM_3D, flm.energy, edgecolor=ec, s=size, linewidth=lw)
-# ax[3,1].scatter(Rsp_gas_3D, flm.energy, edgecolor=ec, s=size, linewidth=lw)
-# ax[3,2].scatter(flm.accretion, flm.energy, edgecolor=ec, s=size, linewidth=lw)
-    
-# ax[2,0].scatter(Rsp_DM_3D, flm.accretion, edgecolor=ec, s=size, linewidth=lw)
-# ax[2,1].scatter(Rsp_gas_3D, flm.accretion, edgecolor=ec, s=size, linewidth=lw)
-    
-# ax[1,0].scatter(Rsp_DM_3D, Rsp_gas_3D, edgecolor=ec, s=size, linewidth=lw)
-
-# mass_bins = np.logspace(np.log10(mass_range[0]), np.log10(mass_range[1]), 30)
-# ax[4,4].hist(flm.M200m, bins=mass_bins, range=mass_range, color="forestgreen", density=True)
-# ax[4,4].set_xscale('log')
-# ax[3,3].hist(flm.energy, bins=30, range=energy_range, color="crimson", density=True)
-# ax[2,2].hist(flm.accretion, bins=30, range=acc_range, color="cornflowerblue", density=True)
-# ax[1,1].hist(Rsp_gas_3D, bins=30, range=gas_range, color="goldenrod", density=True)
-# ax[0,0].hist(Rsp_DM_3D, bins=30, range=DM_range, color="#434343", density=True)
-        
-# #remove axis ticks
-        
-# ax[4,3].set_yticks([])
-# ax[4,2].set_yticks([])
-# ax[4,1].set_yticks([])
-
-# ax[3,1].set_yticks([])
-# ax[3,2].set_yticks([])
-# #ax[3,3].set_yticks([])
-
-# ax[2,1].set_yticks([])
-
-
-# ax[3,0].set_xticks([])
-# ax[2,0].set_xticks([])
-# ax[1,0].set_xticks([])
-# ax[0,0].set_xticks([])
-
-# ax[3,3].set_xticks([])
-# ax[3,2].set_xticks([])
-# ax[3,1].set_xticks([])
-
-# ax[2,2].set_xticks([])
-# ax[2,1].set_xticks([])
-
-# ax[1,1].set_xticks([])
-
-# #set plot limits  
-    
-# for i in range(4):
-#     ax[4,i].set_ylim(mass_range)
-#     ax[i+1,0].set_xlim(DM_range)       
-
-# for i in range(3):
-#     ax[3,i].set_ylim(energy_range)
-#     ax[i+2,1].set_xlim(gas_range)
-    
-# ax[3,2].set_xlim(acc_range)
-# ax[4,2].set_xlim(acc_range)
-# ax[4,3].set_xlim(energy_range)
-
-# ax[2,0].set_ylim(acc_range)
-# ax[2,1].set_ylim(acc_range)
-# ax[1,0].set_ylim(gas_range)
-    
-# #add axis labels
-    
-# ax[4,0].set_xlabel("$R_{\\rm{SP,DM}}$")
-# ax[4,1].set_xlabel("$R_{\\rm{SP,gas}}$")
-# ax[4,2].set_xlabel("$\Gamma$")
-# ax[4,3].set_xlabel("$E_{\\rm{kin}} / E_{\\rm{therm}}$")
-
-# ax[4,0].set_ylabel("$M_{\\rm{200m}}$")
-# ax[3,0].set_ylabel("$E_{\\rm{kin}} / E_{\\rm{therm}}$")
-# ax[2,0].set_ylabel("$\Gamma$")
-# ax[1,0].set_ylabel("$R_{\\rm{SP, gas}}$")
-# #ax[0,0].set_ylabel("$\sigma_{A,EM}$")
-
-
-# #move x axis labels and ticks to top
-# for i in range(5):
-#     #ax[0,i].xaxis.set_label_position('top')
-#     #ax[0,i].xaxis.tick_top()
-    
-#     ax[i,i].yaxis.set_label_position('right')
-#     ax[i,i].yaxis.tick_right()
-    
-# ax[4,4].set_ylabel("$P(M_{\\rm{200m}})$")
-# ax[3,3].set_ylabel("$P(E_{\\rm{kin}} / E_{\\rm{therm}})$")
-# ax[2,2].set_ylabel("$P(\Gamma)$")
-# ax[1,1].set_ylabel("$P(R_{\\rm{SP, gas}})$")
-# ax[0,0].set_ylabel("$P(R_{\\rm{SP, DM}})$")
-
-# ax[3,4].axis('off')
-# ax[2,3].axis('off')
-# ax[2,4].axis('off')
-# ax[1,2].axis('off')
-# ax[1,3].axis('off')
-# ax[1,4].axis('off')
-# ax[0,1].axis('off')
-# ax[0,2].axis('off')
-# ax[0,3].axis('off')
-# ax[0,4].axis('off')
-
-# file_name = "splashback_triangle.pdf"    
-# #plt.savefig(file_name, dpi=300)
-    
-# plt.show()
