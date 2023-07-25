@@ -336,7 +336,7 @@ def stack_for_params():
     axes[0].legend()
     axes[2].legend()
     filename = "splashback_data/flamingo/plots/parameter_dependence.png"
-    # plt.savefig(filename, dpi=300)
+    plt.savefig(filename, dpi=300)
     plt.show()
 
 
