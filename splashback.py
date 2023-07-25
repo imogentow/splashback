@@ -220,7 +220,7 @@ def stack_fixed(data, split, split_bins, dim="3D", bootstrap="none"):
         setattr(data, split+ "_log" + saving_strings[i], log)
     
     if bootstrap != "none":
-        Rsp_error = bootstrap_errors(data, stacking_data, split_data, split_bins)
+        Rsp_error = bootstrap_errors(data, stacking_data, split, split_data, split_bins)
         for i in range(N_profiles):
             setattr(data, "error_R_" + split + saving_strings[i], Rsp_error[i,:])
     
@@ -333,9 +333,38 @@ def stack_and_find_2D(data, split, split_bins):
     setattr(data, "R_WL_"+split, R_SP_WL)
     setattr(data, "depth_WL_"+split, depth_WL)
     
+def second_caustic(Rsp, second):
+    """
+    Tests if quantity is a splashback or second caustic and replaces if necessary.
 
-def bootstrap_errors(data, stacking_data, split_data, split_bins, dim="3D"):
-    N_bootstrap = 1000
+    Parameters
+    ----------
+    data : obj,
+        Simulation data object.
+    split : str
+        Name of quantity used for stacking the profiles.
+
+    Returns
+    -------
+    Rsp : numpy array
+        Array of splashback radii values
+    second : numpy array
+        Array of second caustic radii values
+    """
+    second_mask = np.where(np.isfinite(second))[0]
+    for i in range(len(second_mask)):
+        index = second_mask[i]
+        if Rsp[index] < second[index]:
+            larger = second[index]
+            smaller = Rsp[index]
+            Rsp[index] = larger
+            second[index] = smaller
+    return Rsp, second
+    
+
+def bootstrap_errors(data, stacking_data, split, split_data, split_bins, 
+                     dim="3D"):
+    N_bootstrap=1000
     N_profiles = stacking_data.shape[2] #CHECK INDEX
     not_nan = np.where(np.isfinite(split_data)==True)[0]
     bins_sort = np.digitize(split_data[not_nan], split_bins)
@@ -347,13 +376,16 @@ def bootstrap_errors(data, stacking_data, split_data, split_bins, dim="3D"):
             bin_mask = np.where(bins_sort == i+1)[0]
             stacked_data = np.zeros((N_bootstrap, data.N_rad))
             for j in range(N_bootstrap):
+                print(j)
                 # Select random sample from bin with replacement
                 sample = np.random.choice(bin_mask, 
                                           size=len(bin_mask),
                                           replace=True)
                 stacked_data[j,:] = stack_data(stacking_data[not_nan[sample],:,k])
             log_sample = log_gradients(data.rad_mid, stacked_data)
-            Rsp_sample = dr.depth_cut(data.rad_mid, log_sample)
+            Rsp_sample, second_sample = dr.depth_cut(data.rad_mid, log_sample, second_caustic="y")
+            if split == "accretion":
+                Rsp_sample, _ = second_caustic(Rsp_sample, second_sample)
             Rsp_error[k,i] = np.nanstd(Rsp_sample)
     return Rsp_error
 
