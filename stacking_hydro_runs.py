@@ -6,8 +6,12 @@ import determine_radius as dr
 plt.style.use("mnras.mplstyle")
 
 box = "L1000N1800"    
+axes_labels = {
+    "mass": "$M_{\\rm{200m}}$",
+    "accretion": "$\Gamma$",
+    "energy": "$E_{\\rm{kin}}/E_{\\rm{therm}}$"}
 
-def bin_profiles(d, accretion_bins, mass_bins, energy_bins):
+def bin_profiles(d, accretion_bins, mass_bins, energy_bins, bootstrap="none"):
     """
     Takes a given run object and bins the density profiles according to
     3 given bin arrays. Also calculates a best fit gradient, assuming that 
@@ -20,285 +24,95 @@ def bin_profiles(d, accretion_bins, mass_bins, energy_bins):
     energy_bins: array giving edge values of bins of energy ratio.
     """
 
-    sp.stack_and_find_3D(d, "accretion", accretion_bins)
-    d.grad_accretion = np.sqrt(np.nanmean((d.R_gas_accretion/d.R_DM_accretion)**2))
-    sp.stack_and_find_3D(d, "mass", mass_bins)
-    d.grad_mass = np.sqrt(np.nanmean((d.R_gas_mass/d.R_DM_mass)**2))
-    sp.stack_and_find_3D(d, "energy", energy_bins)
-    d.grad_energy = np.sqrt(np.nanmean((d.R_gas_energy/d.R_DM_energy)**2))
+    sp.stack_and_find_3D(d, "accretion", accretion_bins, bootstrap=bootstrap)
+    sp.stack_and_find_3D(d, "mass", mass_bins, bootstrap=bootstrap)
+    sp.stack_and_find_3D(d, "energy", energy_bins, bootstrap=bootstrap)
+
     
-
-def plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, bins, 
-                               plot="_log_DM", stack_type="accretion"):
-    """
-    Plots dlogrho/dlogr profiles for different runs for same stacking criteria.
-
-    Parameters
-    ----------
-    flm_HF : obj
-        "Standard" run data.
-    flm_HWA : obj
-        First alternative run.
-    flm_HSA : obj
-        Second alternative run.
-    bins : numpy array
-        Bins used to stack profiles.
-    plot : str, optional
-        Plot DM or gas profiles. The default is "_log_DM". 
-        Alternative is "_log_gas"
-    stack_type : TYPE, optional
-        Which stacking criteria to use for the profiles. 
-        The default is "accretion".
-
-    Returns
-    -------
-    None.
-
-    """
-    if stack_type=="accretion":
-        symbol = "$\Gamma$"
-    elif stack_type=="mass":
-        symbol="$\log_{10} M_{\\rm{200m}}$"
-    elif stack_type=="energy":
-        symbol="$E_{\\rm{kin}} /E_{\\rm{therm}}$"
+def second_caustic(flm, split):
+    second_all = getattr(flm, "2_DM_"+split)
+    R_sp = getattr(flm, "R_DM_"+split)
     
-    ylim = (-4,0.2)
-    N_bins = len(bins) - 1
-    fig, ax = plt.subplots(nrows=1, ncols=3, 
-                           figsize=(6,2.5), 
-                           sharey=True,
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    cm_HF = plt.cm.autumn(np.linspace(0,0.95,N_bins))
-    cm_HWA = plt.cm.winter(np.linspace(0,1,N_bins))
-    cm_HSA = plt.cm.copper(np.linspace(0,1,N_bins))
-    lw = 0.8
-    for i in range(0, N_bins):
-        if i == 0:
-            label = symbol + "$<$" + str(np.round(bins[1],2))
-        elif i == N_bins-1:
-            label = symbol + "$>$" + str(np.round(bins[i],2))
-        else:
-            label = str(np.round(bins[i],2)) \
-            + "$<$" + symbol + "$<$" \
-            + str(np.round(bins[i+1],2))
-        ax[1].semilogx(rad_mid, getattr(flm_HF, stack_type+plot)[i,:], 
-                       color=cm_HF[i], linewidth=lw,
-                       label=label)
-        ax[0].semilogx(rad_mid, getattr(flm_HWA, stack_type+plot)[i,:], 
-                       color=cm_HWA[i], linewidth=lw,
-                       label=label)
-        ax[2].semilogx(rad_mid, getattr(flm_HSA, stack_type+plot)[i,:], 
-                       color=cm_HSA[i], linewidth=lw,
-                       label=label)
-    ax[0].set_ylim(ylim)
-    ax[1].set_ylim(ylim)
-    ax[2].set_ylim(ylim)
-    ax[0].legend()
-    ax[1].legend()
-    ax[2].legend()
-    ax[1].set_xlabel("$r/R_{\\rm{200m}}$")
-    if plot == "_log_DM":
-        ax[0].set_ylabel("$d \log \\rho_{\\rm{DM}} / d \log r$")
-    elif plot == "_log_gas":
-        ax[0].set_ylabel("$d \log \\rho_{\\rm{gas}} / d \log r$")
-    ax[1].text(0.05, 0.05, "HYDRO_FIDUCIAL", transform=ax[1].transAxes)
-    ax[0].text(0.05, 0.05, "HYDRO_WEAK_AGN", transform=ax[0].transAxes)
-    ax[2].text(0.05, 0.05, "HYDRO_STRONG_AGN", transform=ax[2].transAxes)
-    # filename = "splashback_data/flamingo/plots/compare_runs_energy_DM.png"
-    # plt.savefig(filename, dpi=300)
-    plt.show()
+    second_mask = np.where(np.isfinite(second_all))[0]
+    for i in range(len(second_mask)):
+        index = second_mask[i]
+        if R_sp[index] < second_all[index]:
+            larger = second_all[index]
+            smaller = R_sp[index]
+            R_sp[index] = larger
+            second_all[index] = smaller
+    setattr(flm, "R_DM_"+split, R_sp)
+    setattr(flm, "2_DM_"+split, second_all)
     
     
-def plot_Rsp_scatter(run1, run2, run3, mids):
+def plot_Rsp_scatter(list_of_sims, mids):
     xlim = np.array([0.7,1.4])
     ylim = (0.91,1.2)
+    bin_type = np.array(["accretion", "mass", "energy"])
+    labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$E_{\\rm{kin}} / E_{\\rm{therm}}$"])
     fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(3.3,7),
                             gridspec_kw={'hspace' : 0, 'wspace' : 0})
+                            # sharex=True, sharey=True)
     cm = plt.cm.get_cmap('rainbow')
     axes[0].plot(xlim, xlim, color="k")
-    axes[0].plot(xlim, run1.grad_accretion*xlim, linestyle="--", color="grey")
-    axes[0].plot(xlim, run2.grad_accretion*xlim, linestyle=":", color="grey")
-    axes[0].plot(xlim, run3.grad_accretion*xlim, linestyle="-.", color="grey")
-    axes[0].scatter(run1.R_DM_accretion, run1.R_gas_accretion, 
-                    c=mids[0,:], edgecolor="k", 
-                    cmap=cm, s=75, marker="o",
-                    label=run1.run_label)
-    crange = axes[0].scatter(run2.R_DM_accretion, run2.R_gas_accretion, 
-                             c=mids[0,:], edgecolor="k", 
-                             cmap=cm, s=75, marker="*",
-                             label=run2.run_label)
-    axes[0].scatter(run3.R_DM_accretion, run3.R_gas_accretion, 
-                    c=mids[0,:], edgecolor="k", 
-                    cmap=cm, s=75, marker="v",
-                    label=run3.run_label)
-    # plt.xlabel(r"$R_{\rm{SP,DM}} / R_{\rm{200m}}$")
-    # plt.ylabel(r"$R_{\rm{SP,gas}} / R_{\rm{200m}}$")
-    axes[0].legend(loc='upper left')
+    axes[1].plot(xlim, xlim, color="k")
+    axes[2].plot(xlim, xlim, color="k")
+    N_runs = len(list_of_sims)
     axes[0].set_xlim(xlim)
     axes[0].set_ylim(ylim)
-    axes[0].set_xticklabels([])
-    cbaxes = fig.add_axes([0.185, 0.81, 0.02, 0.1]) 
-    cbar = fig.colorbar(crange, cax=cbaxes, label="$\Gamma$")
-    # filename = "compare_runs_accretion.png"
-    # plt.savefig(filename, dpi=300)
-    # plt.show()
-    
-    ylim = (0.91,1.3)
-    
-    # cm = plt.cm.get_cmap('rainbow')
-    axes[1].plot(xlim, run1.grad_mass*xlim, linestyle="--", color="grey", label=run1.run_label)
-    axes[1].plot(xlim, run2.grad_mass*xlim, linestyle=":", color="grey", label=run2.run_label)
-    axes[1].plot(xlim, run3.grad_mass*xlim, linestyle="-.", color="grey", label=run3.run_label)
-    axes[1].plot(xlim, xlim, color="k")
-    axes[1].scatter(run1.R_DM_mass, run1.R_gas_mass, 
-                c=mids[1,:], edgecolor="k", 
-                cmap=cm, s=75, marker="o") #,
-                # label="HYDRO_FIDUCIAL")
-    axes[1].scatter(run2.R_DM_mass, run2.R_gas_mass, 
-                c=mids[1,:], edgecolor="k", 
-                cmap=cm, s=75, marker="*") #,
-                # label="HYDRO_WEAK_AGN")
-    crange = axes[1].scatter(run3.R_DM_mass, run3.R_gas_mass, 
-                c=mids[1,:], edgecolor="k", 
-                cmap=cm, s=75, marker="v") #,
-                # label="HYDRO_STRONG_AGN")
-    # plt.xlabel(r"$R_{\rm{SP,DM}} / R_{\rm{200m}}$")
-    axes[1].set_ylabel(r"$R_{\rm{SP,gas}} / R_{\rm{200m}}$")
-    axes[1].legend(loc='upper left')
     axes[1].set_xlim(xlim)
     axes[1].set_ylim(ylim)
-    axes[1].set_xticklabels([])
-    cbaxes = fig.add_axes([0.185, 0.505, 0.02, 0.1]) 
-    cbar = plt.colorbar(crange, cax=cbaxes, label="$\log_{10}M_{\\rm{200m}}$")
-    # filename = "compare_runs_mass.png"
-    # plt.savefig(filename, dpi=300)
-    # plt.show()
-    
-    # fig = plt.figure()
-    # cm = plt.cm.get_cmap('rainbow')
-    axes[2].plot(xlim, run1.grad_energy*xlim, linestyle="--", color="grey")
-    axes[2].plot(xlim, run2.grad_energy*xlim, linestyle=":", color="grey")
-    axes[2].plot(xlim, run3.grad_energy*xlim, linestyle="-.", color="grey")
-    axes[2].plot(xlim, xlim, color="k")
-    axes[2].scatter(run1.R_DM_energy, run1.R_gas_energy, 
-                c=mids[2,:], edgecolor="k", 
-                cmap=cm, s=75, marker="o",
-                label=run1.run_label)
-    axes[2].scatter(run2.R_DM_energy, run2.R_gas_energy, 
-                c=mids[2,:], edgecolor="k", 
-                cmap=cm, s=75, marker="*",
-                label=run2.run_label)
-    crange = axes[2].scatter(run3.R_DM_energy, run3.R_gas_energy, 
-                c=mids[2,:], edgecolor="k", 
-                cmap=cm, s=75, marker="v",
-                label=run3.run_label)
-    axes[2].set_xlabel(r"$R_{\rm{SP,DM}} / R_{\rm{200m}}$")
-    # plt.ylabel(r"$R_{\rm{SP,gas}} / R_{\rm{200m}}$")
-    # ax[2].legend()
     axes[2].set_xlim(xlim)
     axes[2].set_ylim(ylim)
-    cbaxes = fig.add_axes([0.185, 0.25, 0.02, 0.1]) 
-    cbar = plt.colorbar(crange, cax=cbaxes, label="$E_{\\rm{kin}} / E_{\\rm{therm}}$")
+    for i in range(3):
+        for k in range(N_runs):
+            crange = axes[i].scatter(getattr(list_of_sims[k], "R_DM_" + bin_type[i]),
+                                     getattr(list_of_sims[k], "R_gas_"+ bin_type[i]),
+                                     c=mids[i,:], edgecolor="k", 
+                                     cmap=cm, s=75, marker="o",
+                                     label=getattr(list_of_sims[k], "run_label"))
+        cbaxes = fig.add_axes([0.185, 0.21, 0.002, 0.005]) 
+        cbar = fig.colorbar(crange, cax=cbaxes, label=labels[i])
+        #colour bars don't quite work but don't need this plot anymore
+
+    axes[0].legend(loc='upper left')
+    axes[1].legend(loc='upper left')
+    axes[2].legend(loc='upper left')
+    axes[0].set_xticklabels([])
+    axes[1].set_xticklabels([])
+    axes[2].set_xlabel(r"$R_{\rm{SP,DM}} / R_{\rm{200m}}$")
+    axes[1].set_ylabel(r"$R_{\rm{SP,gas}} / R_{\rm{200m}}$")
     # filename = "splashback_data/flamingo/plots/compare_runs_new.png"
     # plt.savefig(filename, dpi=300)
     plt.show()
-    
-    # End of big plot
 
 
-def plot_Rsp_params(flm_HF, flm_HWA, flm_HSA, plot_name, mids):
-    fig, ax = plt.subplots(nrows=1, ncols=3, 
-                            sharey=True, figsize=(5,2))
-    ax[0].scatter(mids[0,:], getattr(flm_HF, plot_name+"_accretion"), 
-                  marker="o", edgecolor="k", label="HYDRO_FIDUCIAL",
-                  color="g")
-    ax[0].scatter(mids[0,:], getattr(flm_HWA, plot_name+"_accretion"), 
-                  marker="*", edgecolor="k", label="HYDRO_WEAK_AGN",
-                  color="gold")
-    ax[0].scatter(mids[0,:], getattr(flm_HSA, plot_name+"_accretion"), 
-                  marker="v", edgecolor="k", label="HYDRO_STRONG_AGN",
-                  color="r")
-    # plt.legend()
-    ax[0].set_xlabel(r"$\Gamma$")
-    ax[0].set_ylabel(r"$\gamma(R_{\rm{SP, gas}})$")
-    # plt.show()
+def plot_param_correlations(flm, ax, split, mids, 
+                            ls, quantity="R_DM_"):
+    Rsp = getattr(flm, quantity+split)
+    hf_R = getattr(hf, quantity+split)
+    if split == "accretion" and flm.run=="HF":
+        if quantity == "R_DM_" or quantity == "depth_DM_":
+            label = "Dark matter"
+        elif quantity == "R_gas_" or quantity == "depth_gas_":
+            label = "Gas"
+    elif split == "mass" and (quantity == "R_DM_" or quantity == "depth_DM_"):
+        label = flm.run_label
+    else:
+        label = ""
+    if quantity == "R_DM_" or quantity == "depth_DM_":
+        colour = "darkmagenta"
+    else:
+        colour = "c"
     # plt.figure()
-    ax[1].scatter(mids[1,:], getattr(flm_HF, plot_name+"_mass"), 
-                  marker="o", edgecolor="k", label="HYDRO_FIDUCIAL",
-                  color="g")
-    ax[1].scatter(mids[1,:], getattr(flm_HWA, plot_name+"_mass"), 
-                  marker="*", edgecolor="k", label="HYDRO_WEAK_AGN",
-                  color="gold")
-    ax[1].scatter(mids[1,:], getattr(flm_HSA, plot_name+"_mass"), 
-                  marker="v", edgecolor="k", label="HYDRO_STRONG_AGN",
-                  color="r")
-    
-    ax[0].legend()
-    ax[1].set_xlabel(r"$\log_{10} (M_{\rm{200m}} / M_{\odot})$")
-    # plt.ylabel(r"$R_{\rm{SP,DM}} / R_{\rm{200m}}$")
-    # plt.show()
-    
-    # plt.figure()
-    ax[2].scatter(mids[2,:], getattr(flm_HF, plot_name+"_energy"), 
-                  marker="o", edgecolor="k", label="HYDRO_FIDUCIAL",
-                  color="g")
-    ax[2].scatter(mids[2,:], getattr(flm_HWA, plot_name+"_energy"), 
-                  marker="*", edgecolor="k", label="HYDRO_WEAK_AGN",
-                  color="gold")
-    ax[2].scatter(mids[2,:], getattr(flm_HSA, plot_name+"_energy"), 
-                  marker="v", edgecolor="k", label="HYDRO_STRONG_AGN",
-                  color="r")
-    # plt.legend()
-    ax[2].set_xlabel(r"$E_{\rm{kin}} / E_{\rm{therm}}$")
-    # plt.ylabel(r"$R_{\rm{SP,DM}} / R_{\rm{200m}}$")
-    # filename = "splashback_data/flamingo/plots/compare_depths_gas.png"
-    # plt.savefig(filename, dpi=300)
-    plt.show()
-    
-    
-def plot_Rsp_gamma(flm_HF, flm_HWA, flm_HSA, plot_name, bins):
-    fig, ax = plt.subplots(nrows=2, ncols=1, 
-                           sharex=True, figsize=(3.3,4))
-    cm = plt.cm.get_cmap('rainbow')
-    
-    ax[0].scatter(getattr(flm_HF, "R_DM_"+plot_name), 
-                  getattr(flm_HF, "depth_DM_"+plot_name),
-                  marker="o", edgecolor="k", c=bins,
-                  cmap=cm, label="HYDRO_FIDUCIAL")
-    ax[0].scatter(getattr(flm_HWA, "R_DM_"+plot_name), 
-                  getattr(flm_HWA, "depth_DM_"+plot_name),
-                  marker="*", edgecolor="k", c=bins,
-                  cmap=cm, label="HYDRO_WEAK_AGN")
-    ax[0].scatter(getattr(flm_HSA, "R_DM_"+plot_name), 
-                  getattr(flm_HSA, "depth_DM_"+plot_name),
-                  marker="v", edgecolor="k", c=bins,
-                  cmap=cm, label="HYDRO_STRONG_AGN")
-    
-    
-    ax[1].scatter(getattr(flm_HF, "R_gas_"+plot_name), 
-                  getattr(flm_HF, "depth_gas_"+plot_name),
-                  marker="o", edgecolor="k", c=bins,
-                  cmap=cm, label="HYDRO_FIDUCIAL")
-    ax[1].scatter(getattr(flm_HWA, "R_gas_"+plot_name), 
-                  getattr(flm_HWA, "depth_gas_"+plot_name),
-                  marker="*", edgecolor="k", c=bins,
-                  cmap=cm, label="HYDRO_WEAK_AGN")
-    crange = ax[1].scatter(getattr(flm_HSA, "R_gas_"+plot_name), 
-                           getattr(flm_HSA, "depth_gas_"+plot_name),
-                           marker="v", edgecolor="k", c=bins,
-                           cmap=cm, label="HYDRO_STRONG_AGN")
-    
-    ax[0].legend()
-    cbaxes = fig.add_axes([0.195, 0.4, 0.02, 0.1]) 
-    cbar = plt.colorbar(crange, cax=cbaxes, label="$E_{\\rm{kin}} / E_{\\rm{therm}}$")
-    # ax[0].set_xlabel("$R_{\\rm{SP,DM}}$")
-    ax[1].set_xlabel("$R_{\\rm{SP}}$")
-    ax[0].set_ylabel("$\gamma(R_{\\rm{SP,DM}})$")
-    ax[1].set_ylabel("$\gamma(R_{\\rm{SP,gas}})$")
-    filename = "splashback_data/flamingo/plots/compare_Rsp_gamma_energy.png"
-    plt.savefig(filename, dpi=300)
-    plt.show()
-    
+    if split == "mass":
+        ax.set_xscale('log')
+    ax.plot(mids, Rsp/hf_R, # yerr=3*errors_DM, 
+                color=colour, 
+                label=label,
+                linestyle=ls)
+    ax.set_xlabel(axes_labels[split])
+
     
 def plot_params_all(bins, y, labels):
     """
@@ -422,24 +236,8 @@ def stack_for_profiles(list_of_sims):
     plot_all_profiles(list_of_sims, bins, quantity="DM")
     plot_all_profiles(list_of_sims, bins, quantity="gas")
     
-    # plot_profiles_compare_bins(run1, accretion_bins, mass_bins, energy_bins,
-    #                             quantity="DM")
-
-    # plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, accretion_bins,
-    #                             stack_type="accretion", plot="_log_DM")
-    # plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, accretion_bins,
-    #                             stack_type="accretion", plot="_log_gas")
-    # plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, mass_bins,
-    #                             stack_type="mass", plot="_log_DM")
-    # plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, mass_bins,
-    #                             stack_type="mass", plot="_log_gas")
-    # plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, energy_bins,
-    #                             stack_type="energy", plot="_log_DM")
-    # plot_profiles_compare_runs(flm_HF, flm_HWA, flm_HSA, energy_bins,
-    #                             stack_type="energy", plot="_log_gas")
     
-    
-def stack_for_Rsp(run1, run2, run3):
+def stack_for_Rsp(list_of_sims):
     N_bins = 10
     mass_bins = np.linspace(14, 15, N_bins+1)
     mass_bins = np.append(mass_bins, 16)
@@ -448,9 +246,9 @@ def stack_for_Rsp(run1, run2, run3):
     energy_bins = np.linspace(0.05, 0.3, N_bins+1)
     energy_bins = np.append(energy_bins, 1)
     
-    bin_profiles(run1, accretion_bins, mass_bins, energy_bins)
-    bin_profiles(run2, accretion_bins, mass_bins, energy_bins)
-    bin_profiles(run3, accretion_bins, mass_bins, energy_bins)
+    N_runs = len(list_of_sims)
+    for i in range(N_runs):
+        bin_profiles(list_of_sims[i], accretion_bins, mass_bins, energy_bins)
     
     mass_mid = np.zeros(N_bins+1)
     accretion_mid = np.zeros(N_bins+1)
@@ -466,18 +264,80 @@ def stack_for_Rsp(run1, run2, run3):
     mids = np.vstack((accretion_mid, mass_mid, energy_mid))
     
     # Make big plot comparing Rsp for different runs and stacking criteria.
-    plot_Rsp_scatter(run1, run2, run3, mids)
+    plot_Rsp_scatter(list_of_sims, mids)
     
-    # Rsp_acc = np.vstack((run1.R_DM_accretion, run2.R_DM_accretion, run3.R_DM_accretion))
-    # Rsp_mass = np.vstack((run1.R_DM_mass, run2.R_DM_mass, run3.R_DM_mass))
-    # Rsp_energy = np.vstack((run1.R_DM_energy, run2.R_DM_energy, run3.R_DM_energy))
-    # Rsp = np.dstack((Rsp_acc, Rsp_mass, Rsp_energy))
-    # labels = [run1.run_label, run2.run_label, run2.run_label]
-    # plot_params_all(mids, Rsp, labels)
     
-    # Compare splashback with different quantities
-    # plot_Rsp_params(flm_HF, flm_HWA, flm_HSA, "depth_gas", mids)
-    # plot_Rsp_gamma(flm_HF, flm_HWA, flm_HSA, "energy", energy_mid)
+def stack_for_params(list_of_sims):
+    N_bins = 10
+    mass_bins = np.linspace(14, 15.6, N_bins+1)
+    accretion_bins = np.linspace(0, 4.2, N_bins+1)
+    energy_bins = np.linspace(0.05, 0.35, N_bins+1)
+    mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
+    accretion_mid = (accretion_bins[:-1] + accretion_bins[1:])/2
+    energy_mid = (energy_bins[:-1] + energy_bins[1:])/2
+    
+    N_runs = len(list_of_sims)
+    for i in range(N_runs):
+        bin_profiles(list_of_sims[i], accretion_bins, mass_bins, energy_bins)
+        second_caustic(list_of_sims[i], "accretion")
+    linestyles = ["-", "--", (0,(1,1)), (0,(3,1,1,1)), (0,(1,2)),
+                  (0, (3, 1, 1, 1, 1, 1)), (0, (3, 2, 1, 2)), (0, (5, 1))]
+
+    fig, axes = plt.subplots(nrows=2, ncols=3, 
+                             sharey="row",
+                             figsize=(7,5),
+                             gridspec_kw={'hspace' : 0, 'wspace' : 0})
+    for i in range(N_runs):
+        plot_param_correlations(list_of_sims[i], axes[0,0], "accretion", accretion_mid, 
+                                linestyles[i])
+        plot_param_correlations(list_of_sims[i], axes[0,1], "mass", mass_mid, 
+                                linestyles[i])
+        plot_param_correlations(list_of_sims[i], axes[0,2], "energy", energy_mid, 
+                                linestyles[i])
+        
+        plot_param_correlations(list_of_sims[i], axes[1,0], "accretion", accretion_mid, 
+                                linestyles[i], quantity="R_gas_")
+        plot_param_correlations(list_of_sims[i], axes[1,1], "mass", mass_mid, 
+                                linestyles[i], quantity="R_gas_")
+        plot_param_correlations(list_of_sims[i], axes[1,2], "energy", energy_mid,
+                                linestyles[i], quantity="R_gas_")
+    
+    fig.text(0.05, 0.45, r"$R_{\rm{SP,model}} / R_{\rm{SP,fiducial}}$",
+             transform=fig.transFigure, rotation='vertical')
+    axes[0,0].legend()
+    axes[0,1].legend()
+    axes[1,0].legend()
+    filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_Rsp.png"
+    plt.savefig(filename, dpi=300)
+    plt.show()
+    
+    fig, axes = plt.subplots(nrows=2, ncols=3, 
+                             sharey="row",
+                             figsize=(7,5),
+                             gridspec_kw={'hspace' : 0, 'wspace' : 0})
+    for i in range(N_runs):
+        plot_param_correlations(list_of_sims[i], axes[0,0], "accretion", accretion_mid, 
+                                linestyles[i], quantity="depth_DM_")
+        plot_param_correlations(list_of_sims[i], axes[0,1], "mass", mass_mid, 
+                                linestyles[i], quantity="depth_DM_")
+        plot_param_correlations(list_of_sims[i], axes[0,2], "energy", energy_mid, 
+                                linestyles[i], quantity="depth_DM_")
+        
+        plot_param_correlations(list_of_sims[i], axes[1,0], "accretion", accretion_mid, 
+                                linestyles[i], quantity="depth_gas_")
+        plot_param_correlations(list_of_sims[i], axes[1,1], "mass", mass_mid, 
+                                linestyles[i], quantity="depth_gas_")
+        plot_param_correlations(list_of_sims[i], axes[1,2], "energy", energy_mid,
+                                linestyles[i], quantity="depth_gas_")
+    
+    fig.text(0.05, 0.45, r"$\gamma_{\rm{SP,model}} / \gamma_{\rm{SP,fiducial}}$",
+             transform=fig.transFigure, rotation='vertical')
+    axes[0,0].legend()
+    axes[0,1].legend()
+    axes[1,0].legend()
+    filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_gamma.png"
+    plt.savefig(filename, dpi=300)
+    plt.show()
     
     
 N_rad = 44
@@ -512,13 +372,7 @@ if __name__ == "__main__":
     hpv = sp.flamingo(box, "HPV")
     hpv.read_properties()
     
-    stack_for_profiles([hf, hwa, hsa, hta, hj, hsj])
-    # stack_for_profiles(hf, hj, hsj)
+    # stack_for_profiles([hf, hwa, hsa, hta, hj, hsj])
     # stack_for_profiles(hp, hpf, hpv)
-    
-    # stack_for_Rsp(hwa, hf, hsa)
-    # stack_for_Rsp(hf, hj, hsj)
-    # stack_for_Rsp(hp, hpf, hpv)
-    
-    
-    
+
+    stack_for_params([hf, hwa, hsa, hta, hj, hsj])
