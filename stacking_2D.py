@@ -1,29 +1,32 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import splashback as sp
-import determine_radius as dr
-import stacking_3D as s3D
 
 plt.style.use("mnras.mplstyle")
     
-def bin_profiles(d, bins):
+def bin_profiles(d, bins, list_of_names):
     """
     Takes a given run object and bins the density profiles according to
     3 given bin arrays. Also calculates a best fit gradient, assuming that 
     the line goes through the origin.
     
-    Inputs.
-    d: obj, run of choice
-    bins: array giving edge values of bins of accretion rate, mass and energy
-    ratio.
+    Parameters
+    ----------
+    d : obj
+        Simulation dataset object of choice
+    bins : numpy array
+        Array of bins used for stacking. (N_types, N_bins)
+    list_of_names : list
+        List of names of stacking criteria, given as strings
+
+    Returns
+    -------
+    None.
+
     """
-    sp.stack_and_find_2D(d, "accretion", bins[0,:])
-    sp.stack_and_find_2D(d, "mass", bins[1,:])
-    sp.stack_and_find_2D(d, "energy", bins[2,:])
-    sp.stack_and_find_2D(d, "concentration", bins[3,:])
-    sp.stack_and_find_2D(d, "symmetry", bins[4,:])
-    sp.stack_and_find_2D(d, "alignment", bins[5,:])
-    sp.stack_and_find_2D(d, "centroid", bins[6,:])
+    N_stack = bins.shape[0]
+    for i in range(N_stack):
+        sp.stack_and_find_2D(d, list_of_names[i], bins[i,:])
     
     
 def plot_profiles_compare_bins(flm, bins, quantity="EM"):
@@ -319,33 +322,33 @@ def scatter_compare_sw(data, mids):
     plt.show()
     
     
-def plot_stack_morph(data, bins):
-    fig, ax = plt.subplots(nrows=3, ncols=4, 
+def plot_observables(data, bins):
+    fig, ax = plt.subplots(nrows=3, ncols=5, 
                            sharex=True,
                            sharey='row',
                            gridspec_kw={'hspace' : 0, 'wspace' : 0},
-                           figsize=(7,5))
-    bin_type = np.array(["concentration", "symmetry", "alignment", "centroid"])
-    labels = np.array(["$c$", "$s$", "$a$", r"$ \log \langle w \rangle$"])
+                           figsize=(8,5))
+    bin_type = np.array(["concentration", "symmetry", "alignment", "centroid", "gap"])
+    labels = np.array(["$c$", "$s$", "$a$", r"$ \log \langle w \rangle$", "$M14$"])
     N_bins = bins.shape[1] - 1
 
-    cmap_bins = np.linspace(0,0.95,N_bins)
-    cmaps = ["autumn", "winter", "copper", "spring"]
+    cmap_bins = np.linspace(0,0.95, N_bins)
+    cmaps = ["autumn", "winter", "copper", "spring", "cool"]
     quantities = ["EM", "SZ", "WL"]
 
     lw = 0.8
     for i in range(0, N_bins):
-        for j in range(4):
+        for j in range(5):
             cm = getattr(plt.cm, cmaps[j])(cmap_bins)
             for k in range(3):
                 if i == 0 and k == 0:
-                    label = labels[j] + "$<$"  + str(np.round(bins[j+3,1],2))
+                    label = labels[j] + "$<$"  + str(np.round(bins[j,1],2))
                 elif i == N_bins-1 and k==0:
-                    label = labels[j] + "$>$" + str(np.round(bins[j+3,i],2))
+                    label = labels[j] + "$>$" + str(np.round(bins[j,i],2))
                 elif k == 0:
-                    label = str(np.round(bins[j+3,i],2)) \
+                    label = str(np.round(bins[j,i],2)) \
                         + "$<$" + labels[j] + "$<$" \
-                        + str(np.round(bins[j+3,i+1],2))
+                        + str(np.round(bins[j,i+1],2))
                 else:
                     label=None
                 
@@ -353,8 +356,8 @@ def plot_stack_morph(data, bins):
                                  color=cm[i], linewidth=lw,
                                  label=label)
 
-    for a in ax.flat:
-        a.legend()
+    for a in range(5):
+        ax[0,a].legend()
     # plt.xlabel("$r/R_{\\rm{200m}}$")
     ylim = ax[0,0].get_ylim()
     ax[0,0].set_ylim((ylim[0],3))
@@ -362,39 +365,43 @@ def plot_stack_morph(data, bins):
     ax[0,0].set_ylabel(r"$d \log \Sigma_{\rm{EM}} / d \log r$")
     ax[1,0].set_ylabel(r"$d \log \Sigma_{\rm{SZ}} / d \log r$")
     ax[2,0].set_ylabel(r"$d \log \Sigma_{\rm{WL}} / d \log r$")
-    # filename = "splashback_data/flamingo/plots/profiles_2D_morphology.png"
-    # plt.savefig(filename, dpi=300)
+    filename = "splashback_data/flamingo/plots/profiles_2D_observables.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
+    
+    
+def mass_cut(data, mass_range, quantities):
+    mass_range = 10**mass_range
+    mass_cut = np.where((data.M200m >= mass_range[0]) & 
+                        (data.M200m < mass_range[1]))[0]
+    N_quant = len(quantities)
+    for i in range(N_quant):
+        values = getattr(data, quantities[i])
+        setattr(data, quantities[i], values[mass_cut])
+    
     
 def stack_for_profiles():
     N_bins = 5
-    mass_bins = np.linspace(14, 15, N_bins)
-    mass_bins = np.append(mass_bins, 16)
-    accretion_bins = np.linspace(0, 4, N_bins)
-    accretion_bins = np.append(accretion_bins, 20)
-    energy_bins = np.linspace(0.05, 0.3, N_bins)
-    energy_bins = np.append(energy_bins, 1)
-    c_bins = np.linspace(0.0, 0.4, N_bins)
-    c_bins = np.append(c_bins, 1)
-    s_bins = np.linspace(0.0, 1.5, N_bins-1) #set extra limits on both sides
-    s_bins = np.append(s_bins, 2.2)
-    s_bins = np.append(-1.5, s_bins)
-    a_bins = np.linspace(0.4, 1.6, N_bins-1) #set extra limits on both sides
-    a_bins = np.append(a_bins, 5)
-    a_bins = np.append(-1., a_bins)
-    w_bins = np.linspace(-3, -1, N_bins-1) #set extra limits on both sides
-    w_bins = np.append(w_bins, 0)
-    w_bins = np.append(-5, w_bins)
+    c_bins = np.append(np.linspace(0.0, 0.4, N_bins), 1)
+    s_bins = np.append(-1.5, np.append(np.linspace(0.05, 1.4, int(N_bins-1)), 2.2))
+    a_bins = np.append(-1., np.append(np.linspace(0.5, 1.5, N_bins-1), 5))
+    w_bins = np.append(-5, np.append(np.linspace(-2.7, -1, N_bins-1), 0))
+    gap_bins = np.append(np.linspace(0,2.5, N_bins), 8)
     
-    bins = np.vstack((accretion_bins, mass_bins, energy_bins, c_bins,
-                      s_bins, a_bins, w_bins))
-    bin_profiles(flm, bins)
+    mass_restriction = np.array([14.2, 14.4])
+    quantities_to_restrict = ["concentration", "symmetry", "alignment", "centroid",
+                              "EM_median", "SZ_median", "WL_median", "gap"]
+    mass_cut(flm, mass_restriction, quantities_to_restrict)
+    
+    bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
+    list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
+    bin_profiles(flm, bins, list_of_bins)
 
     # plot_profiles_compare_bins(flm, bins, quantity="EM")
     # plot_profiles_compare_bins(flm, bins, quantity="SZ")
     # plot_profiles_compare_bins(flm, bins, quantity="WL")
     
-    plot_stack_morph(flm, bins)
+    plot_observables(flm, bins)
     
     
 def stack_for_Rsp():
@@ -420,7 +427,6 @@ def stack_for_Rsp():
     bins = np.vstack((accretion_bins, mass_bins, energy_bins, c_bins,
                       s_bins, a_bins, w_bins))
     bin_profiles(flm, bins)
-    s3D.bin_profiles(flm, accretion_bins, mass_bins, energy_bins)
     sp.stack_and_find_3D(flm, "concentration", c_bins)
     sp.stack_and_find_3D(flm, "symmetry", s_bins)
     sp.stack_and_find_3D(flm, "alignment", a_bins)
@@ -482,7 +488,8 @@ if __name__ == "__main__":
     flm.read_2D()
     flm.read_2D_properties()
     flm.read_properties()
+    flm.read_magnitude_gap(twodim=True)
     
-    # stack_for_profiles()
-    stack_for_Rsp()
+    stack_for_profiles()
+    # stack_for_Rsp()
     
