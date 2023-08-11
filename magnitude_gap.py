@@ -42,8 +42,8 @@ for i in range(N_bins):
 plt.legend()
 plt.xlabel("$r/R_{\\rm{200m}}$")
 plt.ylabel("$d \log \\rho_{\\rm{DM}} / d \log r$")
-filename = "splashback_data/flamingo/plots/magnitude_gap_profiles.png"
-plt.savefig(filename, dpi=300)
+# filename = "splashback_data/flamingo/plots/magnitude_gap_profiles.png"
+# plt.savefig(filename, dpi=300)
 plt.show()
 
 fig, ax = plt.subplots(nrows=2, ncols=1,
@@ -61,9 +61,12 @@ for i in range(N_bins):
                  linewidth=0.8, label=label)
 ax[0].legend()
 ax[1].set_xlabel("$r/R_{\\rm{200m}}$")
-plt.ylabel("$d \log \\rho_{\\rm{DM}} / d \log r$")
-filename = "splashback_data/flamingo/plots/magnitude_gap_profiles_high_res.png"
-plt.savefig(filename, dpi=300)
+fig.text(0.02, 0.45, "$d \log \\rho_{\\rm{DM}} / d \log r$", 
+         transform=fig.transFigure, rotation='vertical')
+ax[0].text(0.03, 0.05, "L1_m9", transform=ax[0].transAxes)
+ax[1].text(0.03, 0.05, "L1_m8", transform=ax[1].transAxes)
+# filename = "splashback_data/flamingo/plots/gap_res_compare.png"
+# plt.savefig(filename, dpi=300)
 plt.show()
 
 # print(len(flm.gap[np.isfinite(flm.gap)]))
