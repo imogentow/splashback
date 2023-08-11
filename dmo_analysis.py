@@ -5,9 +5,9 @@ import determine_radius as dr
 
 plt.style.use("mnras.mplstyle")
 
-box = "L2800N5040"
+box = "L1000N1800"
 
-def dmo_stacking(data, split, split_bins):
+def dmo_stacking(data, split, split_bins, bootstrap="none"):
     if split == "mass":
         split_data = np.log10(data.M200m)
     else:
@@ -34,6 +34,10 @@ def dmo_stacking(data, split, split_bins):
     setattr(data, "R_DM_"+split, R_SP_DM)
     setattr(data, "2_DM_"+split, second)
     setattr(data, "depth_DM_"+split, depth_DM)
+    
+    if bootstrap != "none":
+        Rsp_error = sp.bootstrap_errors(data, data.DM_density_3D, split, split_data, split_bins)
+        setattr(data, "error_R_" + split + "_DM", Rsp_error[0,:])
     
 
 def second_caustic(data, split):
@@ -91,7 +95,8 @@ def plot_profiles(flm, dmo, bins):
     for i in range(0, N_bins):
         for j in range(2):
             if i == 0:
-                label = labels[j] + "$<$"  + str(np.round(bins[j,1],2))
+                label =  str(np.round(bins[j,0],2)) + "$<$" + labels[j] \
+                    + "$<$"  + str(np.round(bins[j,1],2))
             elif i == N_bins-1:
                 label = labels[j] + "$>$" + str(np.round(bins[j,i],2))
             else:
@@ -116,8 +121,8 @@ def plot_profiles(flm, dmo, bins):
     plt.text(0.5, 0.04, "$r/R_{\\rm{200m}}$", transform=fig.transFigure)
     plt.text(0.0, 0.45, r"$d \log \rho_{\rm{DM}} / d \log r$", 
              transform=fig.transFigure, rotation="vertical")
-    # filename = "splashback_data/flamingo/plots/dmo_v_hydro_profiles.png"
-    # plt.savefig(filename, dpi=300)
+    filename = "splashback_data/flamingo/plots/dmo_v_hydro_profiles.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
     
 def compare_rsp(flm, dmo, bins):
@@ -138,6 +143,53 @@ def compare_rsp(flm, dmo, bins):
     plt.legend()
     # plt.savefig("splashback_data/flamingo/plots/dmo_v_hydro_rsp.png", dpi=300)
     plt.show()
+    
+def plot_difference(flm, dmo):
+    delta_accretion = (flm.R_DM_accretion - dmo.R_DM_accretion) 
+    acc_error = np.sqrt(flm.error_R_accretion_DM**2 + dmo.error_R_accretion_DM**2)
+    acc_error = np.sqrt((acc_error/delta_accretion)**2 + (flm.error_R_accretion_DM/ flm.R_DM_accretion)**2)
+    delta_accretion = delta_accretion / flm.R_DM_accretion
+    acc_error = acc_error * delta_accretion
+    print(acc_error)
+    
+    delta_mass = (flm.R_DM_mass - dmo.R_DM_mass) 
+    mass_error = np.sqrt(flm.error_R_mass_DM**2 + dmo.error_R_mass_DM**2)
+    mass_error = np.sqrt((mass_error/delta_mass)**2 + (flm.error_R_mass_DM/ flm.R_DM_mass)**2)
+    delta_mass = delta_mass / flm.R_DM_mass
+    mass_error = mass_error * delta_mass
+    
+    fig, ax = plt.subplots(nrows=1, ncols=2, sharey=True,
+                           gridspec_kw={'hspace' : 0, 'wspace' : 0},
+                           figsize=(4,3))
+    ax[0].errorbar(mass_mid, delta_mass, yerr=mass_error,
+                   fmt="o",
+                   color="cyan",
+                   capsize=3)
+    ax[0].set_xscale('log')
+    ax[0].set_xlabel("$M_{\\rm{200m}}$")
+    ax[0].set_ylabel("$(R_{\\rm{SP,hydro}} - R_{\\rm{SP, DMO}}) / R_{\\rm{SP,hydro}}$")
+    
+    ax[1].errorbar(accretion_mid, delta_accretion, yerr=acc_error,
+                   fmt="o",
+                   color="r",
+                   capsize=3)
+    ax[1].set_xlabel("$\Gamma$")
+    # filename = "splashback_data/flamingo/plots/dmo_differences.png"
+    # plt.savefig(filename, dpi=300)
+    plt.show()
+    
+    # fig, ax1 = plt.subplots(nrows=1, ncols=1)
+    # ax2 = ax1.twiny() #shares y axis
+    # ax1.scatter(mass_mid, delta_mass, 
+    #             color="cyan")
+    # ax1.set_xscale('log')
+    # ax1.set_xlabel("$M_{\\rm{200m}}$")
+    # ax1.set_ylabel("$(R_{\\rm{SP,hydro}} - R_{\\rm{SP, DMO}}) / R_{\\rm{SP,hydro}}$")
+    
+    # ax2.scatter(accretion_mid, delta_accretion, 
+    #             color="r")
+    # ax2.set_xlabel("$\Gamma$")
+    # plt.show()
 
 dmo = sp.flamingo(box, "DMO")
 dmo.read_properties()
@@ -146,38 +198,20 @@ flm = sp.flamingo(box, "HF")
 flm.read_properties()
 # flm.read_low_mass()
 
-N_bins = 4
-mass_bins = np.linspace(14, 15, N_bins+1)
-mass_bins = np.append(mass_bins, 16)
-accretion_bins = np.linspace(0, 4, N_bins+1)
-accretion_bins = np.append(accretion_bins, 20)
+N_bins = 10
+mass_bins = np.linspace(14, 15.4, N_bins+1)
+accretion_bins = np.linspace(0, 4.2, N_bins+1)
+mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
+accretion_mid = (accretion_bins[:-1] + accretion_bins[1:])/2
 bins = np.vstack((accretion_bins, mass_bins))
 
-sp.stack_and_find_3D(flm, "accretion", accretion_bins)
-sp.stack_and_find_3D(flm, "mass", mass_bins)
-dmo_stacking(dmo, "accretion", accretion_bins)
-dmo_stacking(dmo, "mass", mass_bins)
+sp.stack_and_find_3D(flm, "accretion", accretion_bins, bootstrap="y")
+sp.stack_and_find_3D(flm, "mass", mass_bins, bootstrap="y")
+dmo_stacking(dmo, "accretion", accretion_bins, bootstrap="y")
+dmo_stacking(dmo, "mass", mass_bins, bootstrap="y")
 second_caustic(dmo, "accretion")
 second_caustic(flm, "accretion")
 
-plot_profiles(flm, dmo, bins)
-# compare_rsp(flm, dmo, bins)
-
-dmo_mask = np.isfinite(dmo.accretion)
-flm_mask = np.isfinite(flm.accretion)
-
-# fig, ax = plt.subplots(nrows=1, ncols=2,
-#                        figsize=(5,3),
-#                        sharey=True)
-# ax[0].hist(dmo.accretion[dmo_mask], bins=100, range=(-0.5,5))
-# ax[1].hist(flm.accretion[flm_mask], bins=100, range=(-0.5,5))
-# plt.show()
-
-dmo_mean = np.mean(dmo.accretion[dmo_mask])
-dmo_std = np.std(dmo.accretion[dmo_mask])
-
-flm_mean = np.mean(flm.accretion[flm_mask])
-flm_std = np.std(flm.accretion[flm_mask])
-
-print("DMO: mu = " + str(np.round(dmo_mean,3)) + ", sigma = " + str(np.round(dmo_std,3)))
-print("Hydro: mu = " + str(np.round(flm_mean,3)) + ", sigma = " + str(np.round(flm_std,3)))
+# plot_profiles(flm, dmo, bins)
+#compare_rsp(flm, dmo, bins)
+plot_difference(flm, dmo)
