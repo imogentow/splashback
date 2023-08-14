@@ -131,8 +131,18 @@ class flamingo:
         self.M200m = np.hstack((self.M200m, M200m_low))
         self.accretion = np.hstack((self.accretion, accretion_low))
         
+    def read_magnitude_gap(self, twodim=False):
+        magnitudes = np.genfromtxt(self.path + "_galaxy_magnitudes.csv", delimiter=",")
+        sorted_magnitudes = np.sort(magnitudes)
+        mag_bcg = sorted_magnitudes[:,0]
+        mag_fourth = sorted_magnitudes[:,2]
+        self.gap = mag_fourth - mag_bcg
+        if twodim:
+            self.gap = np.hstack((self.gap, self.gap, self.gap))
+        
 
-def stack_fixed(data, split, split_bins, dim="3D", bootstrap="none"):
+def stack_fixed(data, split, split_bins, dim="3D", bootstrap=False,
+                print_data=False):
     """
     For a given set of bins. Stack the DM and gas density profiles for a 
     given run according to a given stacking criteria. Assigns values with
@@ -149,6 +159,11 @@ def stack_fixed(data, split, split_bins, dim="3D", bootstrap="none"):
     dim : str, optional
         Dimension of choice to tell function which profiles to stack. 3D
         stacks gas and DM, 2D stacks EM, SZ and WL. The default is "3D".
+    bootstrap : boolean,
+        Whether or not to calculate bootstrap errors of Rsp values.
+    print_data : boolean
+        Whether or not to print information about the number of halos in each
+        bin.
 
     Returns
     -------
@@ -205,12 +220,14 @@ def stack_fixed(data, split, split_bins, dim="3D", bootstrap="none"):
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
     stacked_data = np.zeros((N_bins, data.N_rad, N_profiles))
-    # print("")
-    # print(names[data.run])
-    # print(split)
+    if print_data:
+        print("")
+        print(names[data.run])
+        print(split)
     for i in range(N_bins):
         bin_mask = np.where(bins_sort == i+1)[0]
-        # print(len(bin_mask))
+        if print_data:
+            print(len(bin_mask))
         for j in range(N_profiles):
             stacked_data[i,:,j] = stack_data(stacking_data[not_nan,:,j][bin_mask,:])
             
@@ -219,7 +236,7 @@ def stack_fixed(data, split, split_bins, dim="3D", bootstrap="none"):
         setattr(data, split+ "_profile" + saving_strings[i], stacked_data[:,:,i]) #previously density instead of profile
         setattr(data, split+ "_log" + saving_strings[i], log)
     
-    if bootstrap != "none":
+    if bootstrap:
         Rsp_error = bootstrap_errors(data, stacking_data, split, split_data, split_bins)
         for i in range(N_profiles):
             setattr(data, "error_R_" + split + saving_strings[i], Rsp_error[i,:])
@@ -256,7 +273,7 @@ def stack_and_find_3D(data, split, split_bins, bootstrap="none"):
                                                               cut=-2.5,
                                                               depth_value="y",
                                                               second_caustic="y")
-    R_SP_gas, depth_gas = dr.depth_cut(data.rad_mid, log_gas, cut=-2.5, depth_value="y")
+    R_SP_gas, depth_gas = dr.depth_cut(data.rad_mid, log_gas, cut=-2, depth_value="y")
     if pressure:
         log_P = getattr(data, split+"_log_P")
         R_SP_P, second_P, depth_P, depth_second = dr.depth_cut(data.rad_mid, 
@@ -364,25 +381,28 @@ def second_caustic(Rsp, second):
 
 def bootstrap_errors(data, stacking_data, split, split_data, split_bins, 
                      dim="3D"):
-    N_bootstrap=1000
+    if stacking_data.ndim != 3:
+        stacking_data = stacking_data[:,:,np.newaxis]
+    N_bootstrap = 100
     N_profiles = stacking_data.shape[2] #CHECK INDEX
     not_nan = np.where(np.isfinite(split_data)==True)[0]
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
     Rsp_error = np.zeros((N_profiles, N_bins))
     
-    for k in range(N_profiles):
-        for i in range(N_bins):
-            bin_mask = np.where(bins_sort == i+1)[0]
-            stacked_data = np.zeros((N_bootstrap, data.N_rad))
-            for j in range(N_bootstrap):
-                print(j)
-                # Select random sample from bin with replacement
-                sample = np.random.choice(bin_mask, 
-                                          size=len(bin_mask),
-                                          replace=True)
-                stacked_data[j,:] = stack_data(stacking_data[not_nan[sample],:,k])
-            log_sample = log_gradients(data.rad_mid, stacked_data)
+    for i in range(N_bins):
+        bin_mask = np.where(bins_sort == i+1)[0]
+        stacked_data = np.zeros((N_bootstrap, data.N_rad, N_profiles))
+        log_sample = np.zeros((N_bootstrap, data.N_rad, N_profiles))
+        for j in range(N_bootstrap):
+            # Select random sample from bin with replacement
+            sample = np.random.choice(bin_mask, 
+                                      size=len(bin_mask),
+                                      replace=True)
+            for k in range(N_profiles):
+                stacked_data[j,:,k] = stack_data(stacking_data[not_nan[sample],:,k])
+        for k in range(N_profiles):
+            log_sample = log_gradients(data.rad_mid, stacked_data[:,:,k])
             Rsp_sample, second_sample = dr.depth_cut(data.rad_mid, log_sample, second_caustic="y")
             if split == "accretion":
                 Rsp_sample, _ = second_caustic(Rsp_sample, second_sample)
@@ -411,7 +431,7 @@ def stack_data(array):
     return profile
 
 
-def log_gradients(radii, array, window=19, order=4):
+def log_gradients(radii, array, window=19, order=4, smooth=True):
     """
     Takes profile, calculates the gradient and then smoothes using a 
     Savitzky-Golay filter.
@@ -426,6 +446,8 @@ def log_gradients(radii, array, window=19, order=4):
         window size for Sav-Gol filter. The default is 19.
     order : int, optional
         Polynomial order for Sav-Gol filter. The default is 4.
+    smooth : boolean
+        Whether or not to smooth the gradient profile.
 
     Returns
     -------
@@ -447,8 +469,11 @@ def log_gradients(radii, array, window=19, order=4):
         density = density[finite] #delete bad values in profiles
         temp_radii = radii[finite]
         
-        dlnrho_dlnr = np.gradient(np.log10(density), np.log10(temp_radii)) 
-        smoothed_array[i,finite] = savgol_filter(dlnrho_dlnr, window, order)
+        dlnrho_dlnr = np.gradient(np.log10(density), np.log10(temp_radii))
+        if smooth:
+            smoothed_array[i,finite] = savgol_filter(dlnrho_dlnr, window, order)
+        else:
+            smoothed_array[i,finite] = dlnrho_dlnr
     if N == 1:
         smoothed_array = smoothed_array.flatten()
         
