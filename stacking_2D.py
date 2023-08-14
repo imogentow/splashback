@@ -215,7 +215,7 @@ def check_proj_Rsp(data, mids, quantity):
     plt.show()
     
     
-def scatter_compare(data, mids):
+def compare_morphology(data, mids):
     fig, ax = plt.subplots(nrows=3, ncols=1,
                            sharex=True,
                            gridspec_kw={'hspace' : 0, 'wspace' : 0},
@@ -274,19 +274,22 @@ def scatter_compare(data, mids):
     plt.show()
     
     
-def scatter_compare_sw(data, mids):
-    fig, ax = plt.subplots(nrows=3, ncols=2,
+def compare_best(data, mids):
+    fig, ax = plt.subplots(nrows=3, ncols=3,
                            sharex=True,
                            sharey='row',
                            gridspec_kw={'hspace' : 0, 'wspace' : 0},
-                           figsize=(3.3,4))
-    bin_type = np.array(["symmetry", "centroid"])
+                           figsize=(5,4))
+    bin_type = np.array(["symmetry", "centroid", "gap"])
     quantities = ["EM", "SZ", "WL"]
     size=50
+    winter = plt.cm.get_cmap("winter")
+    spring = plt.cm.get_cmap("spring")
+    autumn = plt.cm.get_cmap("autumn")
     for i in range(3):
        cs = ax[i,0].scatter(getattr(data, "R_DM_symmetry"), 
                           getattr(data, "R_" + quantities[i] +"_symmetry"),
-                          c=mids[1,:], cmap=plt.cm.get_cmap("winter"),
+                          c=mids[1,:], cmap=winter,
                           edgecolor="k",
                           s=size,
                           marker="*",
@@ -294,16 +297,26 @@ def scatter_compare_sw(data, mids):
 
        cw = ax[i,1].scatter(getattr(data, "R_DM_centroid"), 
                           getattr(data, "R_" + quantities[i] +"_centroid"),
-                          c=mids[3,:], cmap=plt.cm.get_cmap("spring"),
+                          c=mids[3,:], cmap=spring,
                           edgecolor="k",
                           s=size,
                           marker="P",
                           label=r"$\log \langle w \rangle$")
+       
+       cg = ax[i,2].scatter(getattr(data, "R_DM_gap"), 
+                          getattr(data, "R_" + quantities[i] +"_gap"),
+                          c=mids[3,:], cmap=autumn,
+                          edgecolor="k",
+                          s=size,
+                          marker="o",
+                          label=r"$M14$")
 
-    cbaxes2 = fig.add_axes([0.45, 0.7, 0.02, 0.08]) 
-    fig.colorbar(cs, cax=cbaxes2, label="$s$")
-    cbaxes4 = fig.add_axes([0.82, 0.7, 0.02, 0.08]) 
-    fig.colorbar(cw, cax=cbaxes4, label=r"$\log \langle w \rangle$")
+    cbaxes1 = fig.add_axes([0.14, 0.78, 0.015, 0.08]) 
+    fig.colorbar(cs, cax=cbaxes1, label="$s$")
+    cbaxes2 = fig.add_axes([0.40, 0.78, 0.015, 0.08]) 
+    fig.colorbar(cw, cax=cbaxes2, label=r"$\log \langle w \rangle$")
+    cbaxes3 = fig.add_axes([0.67, 0.78, 0.015, 0.08]) 
+    fig.colorbar(cg, cax=cbaxes3, label=r"$M14$")
 
     # ax[0,0].legend()
     # ax[0,1].legend()
@@ -317,8 +330,8 @@ def scatter_compare_sw(data, mids):
     plt.text(0.45, 0.01, "$R_{\\rm{SP,DM}} / R_{\\rm{200m}}$", 
              transform=fig.transFigure)
     
-    filename = "splashback_data/flamingo/plots/compare_Rsp_morph.png"
-    plt.savefig(filename, dpi=300)
+    # filename = "splashback_data/flamingo/plots/compare_Rsp_morph.png"
+    # plt.savefig(filename, dpi=300)
     plt.show()
     
     
@@ -396,86 +409,33 @@ def stack_for_profiles():
     bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
     list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
     bin_profiles(flm, bins, list_of_bins)
-
-    # plot_profiles_compare_bins(flm, bins, quantity="EM")
-    # plot_profiles_compare_bins(flm, bins, quantity="SZ")
-    # plot_profiles_compare_bins(flm, bins, quantity="WL")
     
     plot_observables(flm, bins)
     
     
 def stack_for_Rsp():
     N_bins = 10
-    mass_bins = np.linspace(14, 15, N_bins)
-    mass_bins = np.append(mass_bins, 16)
-    accretion_bins = np.linspace(0, 4, N_bins)
-    accretion_bins = np.append(accretion_bins, 20)
-    energy_bins = np.linspace(0.05, 0.3, N_bins)
-    energy_bins = np.append(energy_bins, 1)
-    c_bins = np.linspace(0.0, 0.4, N_bins)
-    c_bins = np.append(c_bins, 1)
-    s_bins = np.linspace(0.0, 1.5, N_bins-1) #set extra limits on both sides
-    s_bins = np.append(s_bins, 2.2)
-    s_bins = np.append(-1.5, s_bins)
-    a_bins = np.linspace(0.4, 1.6, N_bins-1) #set extra limits on both sides
-    a_bins = np.append(a_bins, 5)
-    a_bins = np.append(-1., a_bins)
-    w_bins = np.linspace(-3, -1, N_bins-1) #set extra limits on both sides
-    w_bins = np.append(w_bins, 0)
-    w_bins = np.append(-5, w_bins)
+    c_bins = np.linspace(0.0, 0.4, N_bins+1)
+    s_bins = np.linspace(0.05, 1.4, N_bins+1)
+    a_bins = np.linspace(0.5, 1.5, N_bins+1)
+    w_bins = np.linspace(-2.7, -1, N_bins+1)
+    gap_bins = np.linspace(0,2.5, N_bins+1)
+    bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
+    list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
+    bin_profiles(flm, bins, list_of_bins)
     
-    bins = np.vstack((accretion_bins, mass_bins, energy_bins, c_bins,
-                      s_bins, a_bins, w_bins))
-    bin_profiles(flm, bins)
-    sp.stack_and_find_3D(flm, "concentration", c_bins)
-    sp.stack_and_find_3D(flm, "symmetry", s_bins)
-    sp.stack_and_find_3D(flm, "alignment", a_bins)
-    sp.stack_and_find_3D(flm, "centroid", w_bins)
+    for i in range(len(list_of_bins)):
+        sp.stack_and_find_3D(flm, list_of_bins[i], bins[i,:])
 
-    mass_mid = np.zeros(N_bins)
-    accretion_mid = np.zeros(N_bins)
-    energy_mid = np.zeros(N_bins)
-    c_mid = np.zeros(N_bins)
-    s_mid = np.zeros(N_bins)
-    a_mid = np.zeros(N_bins)
-    w_mid = np.zeros(N_bins)
-
-    mass_mid[:-1] = (mass_bins[:-2] + mass_bins[1:-1])/2
-    accretion_mid[:-1] = (accretion_bins[:-2] + accretion_bins[1:-1])/2
-    energy_mid[:-1] = (energy_bins[:-2] + energy_bins[1:-1])/2
-    c_mid[:-1] = (c_bins[:-2] + c_bins[1:-1])/2
-    s_mid[1:-1] = (s_bins[1:-2] + s_bins[2:-1])/2
-    a_mid[1:-1] = (a_bins[1:-2] + a_bins[2:-1])/2
-    w_mid[1:-1] = (w_bins[1:-2] + w_bins[2:-1])/2
-    mass_mid[-1] = mass_bins[-2]
-    accretion_mid[-1] = accretion_bins[-2]
-    energy_mid[-1] = energy_bins[-2]
-    c_mid[-1] = c_bins[-2]
-    s_mid[[0,-1]] = [s_bins[1], s_bins[-2]]
-    a_mid[[0,-1]] = [a_bins[1], a_bins[-2]]
-    w_mid[[0,-1]] = [w_bins[1], w_bins[-2]]
+    c_mid = (c_bins[:-1] + c_bins[1:])/2
+    s_mid = (s_bins[:-1] + s_bins[1:])/2
+    a_mid = (a_bins[:-1] + a_bins[1:])/2
+    w_mid = (w_bins[:-1] + w_bins[1:])/2
+    gap_mid = (gap_bins[:-1] + gap_bins[1:])/2
+    mids = np.vstack((c_mid, s_mid, a_mid, w_mid, gap_mid))
     
-    mids = np.vstack((accretion_mid, mass_mid, energy_mid, c_mid,
-                      s_mid, a_mid, w_mid))
+    compare_best(flm, mids)
     
-    # check_proj_Rsp(flm, mids, "EM")
-    # check_proj_Rsp(flm, mids, "SZ")
-    # check_proj_Rsp(flm, mids, "WL")
-    
-    # scatter_compare(flm, mids[3:,:])
-    scatter_compare_sw(flm, mids[3:,:])
-    
-    # plt.scatter(c_mid, flm.R_EM_concentration)
-    # plt.show()
-    
-    # plt.scatter(s_mid, flm.R_EM_symmetry)
-    # plt.show()
-    
-    # plt.scatter(a_mid, flm.R_EM_alignment)
-    # plt.show()
-    
-    # plt.scatter(w_mid, flm.R_EM_centroid)
-    # plt.show()
 
 N_rad = 44
 log_radii = np.linspace(-1, 0.7, N_rad+1)
@@ -490,6 +450,6 @@ if __name__ == "__main__":
     flm.read_properties()
     flm.read_magnitude_gap(twodim=True)
     
-    stack_for_profiles()
-    # stack_for_Rsp()
+    # stack_for_profiles()
+    stack_for_Rsp()
     
