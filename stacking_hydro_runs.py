@@ -87,31 +87,37 @@ def plot_Rsp_scatter(list_of_sims, mids):
     plt.show()
 
 
-def plot_param_correlations(flm, ax, split, mids, 
+def plot_param_correlations(list_of_sims, ax, split, mids, 
                             ls, quantity="R_DM_"):
-    Rsp = getattr(flm, quantity+split)
-    hf_R = getattr(hf, quantity+split)
-    if split == "accretion" and flm.run=="HF":
-        if quantity == "R_DM_" or quantity == "depth_DM_":
-            label = "Dark matter"
-        elif quantity == "R_gas_" or quantity == "depth_gas_":
-            label = "Gas"
-    elif split == "mass" and (quantity == "R_DM_" or quantity == "depth_DM_"):
-        label = flm.run_label
-    else:
-        label = ""
+    N_runs = len(list_of_sims)
+    lw = 1
     if quantity == "R_DM_" or quantity == "depth_DM_":
-        colour = "darkmagenta"
+        cm = plt.cm.copper(np.linspace(0,1, N_runs))
     else:
-        colour = "c"
-    # plt.figure()
-    if split == "mass":
-        ax.set_xscale('log')
-    ax.plot(mids, Rsp/hf_R, # yerr=3*errors_DM, 
-                color=colour, 
+        cm = plt.cm.winter(np.linspace(0,1, N_runs))
+    for i in range(N_runs):
+        flm = list_of_sims[i]
+        Rsp = getattr(flm, quantity+split)
+        hf_R = getattr(hf, quantity+split)
+        if split == "mass":
+            label = flm.run_label
+            ax.set_xscale('log')
+        else:
+            label = ""
+        if i == 0:
+            error = getattr(hf, "error_"+quantity+split)
+            ax.errorbar(mids, Rsp/hf_R, yerr=error*np.sqrt(2),
+                        color=cm[i],
+                        linestyle=ls[i],
+                        linewidth=lw,
+                        capsize=2)
+
+        ax.plot(mids, Rsp/hf_R, # yerr=3*errors_DM, 
+                color=cm[i], 
                 label=label,
-                linestyle=ls)
-    ax.set_xlabel(axes_labels[split])
+                linestyle=ls[i],
+                linewidth=lw)
+        ax.set_xlabel(axes_labels[split])
 
     
 def plot_params_all(bins, y, labels):
@@ -269,7 +275,7 @@ def stack_for_Rsp(list_of_sims):
     
 def stack_for_params(list_of_sims):
     N_bins = 10
-    mass_bins = np.linspace(14, 15.6, N_bins+1)
+    mass_bins = np.linspace(14, 15.2, N_bins+1)
     accretion_bins = np.linspace(0, 4.2, N_bins+1)
     energy_bins = np.linspace(0.05, 0.35, N_bins+1)
     mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
@@ -277,66 +283,78 @@ def stack_for_params(list_of_sims):
     energy_mid = (energy_bins[:-1] + energy_bins[1:])/2
     
     N_runs = len(list_of_sims)
+    bootstrap = True
     for i in range(N_runs):
-        bin_profiles(list_of_sims[i], accretion_bins, mass_bins, energy_bins)
+        bin_profiles(list_of_sims[i], accretion_bins, mass_bins, energy_bins,
+                     bootstrap=bootstrap)
+        bootstrap = False #only true for first sim
         second_caustic(list_of_sims[i], "accretion")
     linestyles = ["-", "--", (0,(1,1)), (0,(3,1,1,1)), (0,(1,2)),
                   (0, (3, 1, 1, 1, 1, 1)), (0, (3, 2, 1, 2)), (0, (5, 1))]
 
     fig, axes = plt.subplots(nrows=2, ncols=3, 
                              sharey="row",
-                             figsize=(7,5),
+                             figsize=(7,4),
                              gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    for i in range(N_runs):
-        plot_param_correlations(list_of_sims[i], axes[0,0], "accretion", accretion_mid, 
-                                linestyles[i])
-        plot_param_correlations(list_of_sims[i], axes[0,1], "mass", mass_mid, 
-                                linestyles[i])
-        plot_param_correlations(list_of_sims[i], axes[0,2], "energy", energy_mid, 
-                                linestyles[i])
+
+    plot_param_correlations(list_of_sims, axes[0,0], "accretion", accretion_mid, 
+                            linestyles)
+    plot_param_correlations(list_of_sims, axes[0,1], "mass", mass_mid, 
+                            linestyles)
+    plot_param_correlations(list_of_sims, axes[0,2], "energy", energy_mid, 
+                            linestyles)
         
-        plot_param_correlations(list_of_sims[i], axes[1,0], "accretion", accretion_mid, 
-                                linestyles[i], quantity="R_gas_")
-        plot_param_correlations(list_of_sims[i], axes[1,1], "mass", mass_mid, 
-                                linestyles[i], quantity="R_gas_")
-        plot_param_correlations(list_of_sims[i], axes[1,2], "energy", energy_mid,
-                                linestyles[i], quantity="R_gas_")
+    plot_param_correlations(list_of_sims, axes[1,0], "accretion", accretion_mid, 
+                            linestyles, quantity="R_gas_")
+    plot_param_correlations(list_of_sims, axes[1,1], "mass", mass_mid, 
+                            linestyles, quantity="R_gas_")
+    plot_param_correlations(list_of_sims, axes[1,2], "energy", energy_mid,
+                            linestyles, quantity="R_gas_")
     
     fig.text(0.05, 0.45, r"$R_{\rm{SP,model}} / R_{\rm{SP,fiducial}}$",
              transform=fig.transFigure, rotation='vertical')
-    axes[0,0].legend()
-    axes[0,1].legend()
-    axes[1,0].legend()
-    filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_Rsp.png"
-    plt.savefig(filename, dpi=300)
+    axes[0,0].text(0.68, 0.05, "Dark matter",
+             transform=axes[0,0].transAxes)
+    axes[1,0].text(0.88, 0.05, "Gas",
+             transform=axes[1,0].transAxes)
+    axes[0,1].legend(ncol=2)
+    axes[1,1].legend(ncol=2)
+    axes[0,0].set_ylim((0.75, 1.2))
+    axes[1,0].set_ylim((0.75, 1.2))
+    # filename = "splashback_data/flamingo/plots/parameter_dependence_cosmo_Rsp.png"
+    # plt.savefig(filename, dpi=300)
     plt.show()
     
     fig, axes = plt.subplots(nrows=2, ncols=3, 
-                             sharey="row",
-                             figsize=(7,5),
-                             gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    for i in range(N_runs):
-        plot_param_correlations(list_of_sims[i], axes[0,0], "accretion", accretion_mid, 
-                                linestyles[i], quantity="depth_DM_")
-        plot_param_correlations(list_of_sims[i], axes[0,1], "mass", mass_mid, 
-                                linestyles[i], quantity="depth_DM_")
-        plot_param_correlations(list_of_sims[i], axes[0,2], "energy", energy_mid, 
-                                linestyles[i], quantity="depth_DM_")
+                              sharey="row",
+                              figsize=(7,4),
+                              gridspec_kw={'hspace' : 0, 'wspace' : 0})
+    plot_param_correlations(list_of_sims, axes[0,0], "accretion", accretion_mid, 
+                            linestyles, quantity="depth_DM_")
+    plot_param_correlations(list_of_sims, axes[0,1], "mass", mass_mid, 
+                            linestyles, quantity="depth_DM_")
+    plot_param_correlations(list_of_sims, axes[0,2], "energy", energy_mid, 
+                            linestyles, quantity="depth_DM_")
         
-        plot_param_correlations(list_of_sims[i], axes[1,0], "accretion", accretion_mid, 
-                                linestyles[i], quantity="depth_gas_")
-        plot_param_correlations(list_of_sims[i], axes[1,1], "mass", mass_mid, 
-                                linestyles[i], quantity="depth_gas_")
-        plot_param_correlations(list_of_sims[i], axes[1,2], "energy", energy_mid,
-                                linestyles[i], quantity="depth_gas_")
+    plot_param_correlations(list_of_sims, axes[1,0], "accretion", accretion_mid, 
+                            linestyles, quantity="depth_gas_")
+    plot_param_correlations(list_of_sims, axes[1,1], "mass", mass_mid, 
+                            linestyles, quantity="depth_gas_")
+    plot_param_correlations(list_of_sims, axes[1,2], "energy", energy_mid,
+                            linestyles, quantity="depth_gas_")
     
     fig.text(0.05, 0.45, r"$\gamma_{\rm{SP,model}} / \gamma_{\rm{SP,fiducial}}$",
-             transform=fig.transFigure, rotation='vertical')
-    axes[0,0].legend()
-    axes[0,1].legend()
-    axes[1,0].legend()
-    filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_gamma.png"
-    plt.savefig(filename, dpi=300)
+              transform=fig.transFigure, rotation='vertical')
+    axes[0,0].text(0.04, 0.05, "Dark matter",
+             transform=axes[0,0].transAxes)
+    axes[1,0].text(0.04, 0.05, "Gas",
+             transform=axes[1,0].transAxes)
+    axes[0,1].legend(ncol=2)
+    axes[1,1].legend(ncol=2)
+    axes[0,0].set_ylim((0.75, 1.2))
+    axes[1,0].set_ylim((0.75, 1.2))
+    # filename = "splashback_data/flamingo/plots/parameter_dependence_cosmo_gamma.png"
+    # plt.savefig(filename, dpi=300)
     plt.show()
     
     
@@ -357,6 +375,9 @@ if __name__ == "__main__":
     hta = sp.flamingo(box, "HTA")
     hta.read_properties()
     
+    hua = sp.flamingo(box, "HUA")
+    hua.read_properties()
+    
     hj = sp.flamingo(box, "HJ")
     hj.read_properties()
     
@@ -375,4 +396,5 @@ if __name__ == "__main__":
     # stack_for_profiles([hf, hwa, hsa, hta, hj, hsj])
     # stack_for_profiles(hp, hpf, hpv)
 
-    stack_for_params([hf, hwa, hsa, hta, hj, hsj])
+    # stack_for_params([hf, hwa, hsa, hta, hua, hj, hsj])
+    stack_for_params([hf, hp, hpf, hpv])
