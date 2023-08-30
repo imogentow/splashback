@@ -237,12 +237,14 @@ def stack_fixed(data, split, split_bins, dim="3D", bootstrap=False,
         setattr(data, split+ "_log" + saving_strings[i], log)
     
     if bootstrap:
-        Rsp_error = bootstrap_errors(data, stacking_data, split, split_data, split_bins)
+        Rsp_error, gamma_error = bootstrap_errors(data, stacking_data, split, split_data, split_bins)
         for i in range(N_profiles):
-            setattr(data, "error_R_" + split + saving_strings[i], Rsp_error[i,:])
+            setattr(data, "error_R" + saving_strings[i] + "_" + split , Rsp_error[i,:])
+            setattr(data, "error_depth" + saving_strings[i] + "_" + split , gamma_error[i,:])
     
 
-def stack_and_find_3D(data, split, split_bins, bootstrap="none"):
+def stack_and_find_3D(data, split, split_bins, bootstrap=False,
+                      print_data=False):
     """
     Stacks data using stack_3D_function. Uses new profiles to determine 
     splashback radius and depth of minima.
@@ -258,14 +260,17 @@ def stack_and_find_3D(data, split, split_bins, bootstrap="none"):
         Name of stacking criteria.
     split_bins : numpy array
         Bins to use to split stacking criteria.
-    bootstrap : str
+    bootstrap : bool
         Whether or not to calculate bootstrap errors of Rsp.
     """
     pressure = hasattr(data, 'gas_pressure_3D')
     entropy = hasattr(data, 'gas_entropy_3D')
     velocity = hasattr(data, 'gas_velocity_3D')
+    temperature = hasattr(data, 'gas_temperature_3D')
     
-    stack_fixed(data, split, split_bins, bootstrap=bootstrap)
+    stack_fixed(data, split, split_bins, 
+                bootstrap=bootstrap, 
+                print_data=print_data)
     log_DM = getattr(data, split+"_log_DM")
     log_gas = getattr(data, split+"_log_gas")
     R_SP_DM, second_DM, depth_DM, depth_second = dr.depth_cut(data.rad_mid, 
@@ -302,6 +307,13 @@ def stack_and_find_3D(data, split, split_bins, bootstrap="none"):
                                 log_v, 
                                 cut=0.5)
         setattr(data, "R_v_"+split, R_SP_v)
+        
+    if temperature:
+        log_T = getattr(data, split+"_log_T")
+        R_SP_T = dr.depth_cut(data.rad_mid, 
+                              log_T, 
+                              cut=0.5)
+        setattr(data, "R_T_"+split, R_SP_T)
     
     setattr(data, "R_DM_"+split, R_SP_DM)
     setattr(data, "2_DM_"+split, second_DM)
@@ -383,12 +395,13 @@ def bootstrap_errors(data, stacking_data, split, split_data, split_bins,
                      dim="3D"):
     if stacking_data.ndim != 3:
         stacking_data = stacking_data[:,:,np.newaxis]
-    N_bootstrap = 100
+    N_bootstrap = 1000
     N_profiles = stacking_data.shape[2] #CHECK INDEX
     not_nan = np.where(np.isfinite(split_data)==True)[0]
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
     Rsp_error = np.zeros((N_profiles, N_bins))
+    depth_error = np.zeros((N_profiles, N_bins))
     
     for i in range(N_bins):
         bin_mask = np.where(bins_sort == i+1)[0]
@@ -403,11 +416,15 @@ def bootstrap_errors(data, stacking_data, split, split_data, split_bins,
                 stacked_data[j,:,k] = stack_data(stacking_data[not_nan[sample],:,k])
         for k in range(N_profiles):
             log_sample = log_gradients(data.rad_mid, stacked_data[:,:,k])
-            Rsp_sample, second_sample = dr.depth_cut(data.rad_mid, log_sample, second_caustic="y")
+            Rsp_sample, second, gamma, _ = dr.depth_cut(data.rad_mid, 
+                                                        log_sample, 
+                                                        second_caustic="y",
+                                                        depth_value="y")
             if split == "accretion":
-                Rsp_sample, _ = second_caustic(Rsp_sample, second_sample)
+                Rsp_sample, _ = second_caustic(Rsp_sample, second)
             Rsp_error[k,i] = np.nanstd(Rsp_sample)
-    return Rsp_error
+            depth_error[k,i] = np.nanstd(gamma)
+    return Rsp_error, depth_error
 
 def stack_data(array):
     """
