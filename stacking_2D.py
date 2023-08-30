@@ -27,6 +27,15 @@ def bin_profiles(d, bins, list_of_names):
     N_stack = bins.shape[0]
     for i in range(N_stack):
         sp.stack_and_find_2D(d, list_of_names[i], bins[i,:])
+        
+
+def convert_SZ_profiles():
+    radii = np.logspace(-1, 0.7, 45)
+    R200m = np.genfromtxt(flm.path+"_R200m.csv", delimiter=",")
+    area = np.pi * (radii[1:]**2 - radii[:-1]**2) * 10 / 50 #in R200m not mpc
+    area = np.outer(R200m, area)
+    area = np.vstack((area, area, area))
+    flm.SZ_median = flm.SZ_median / area
     
     
 def plot_profiles_compare_bins(flm, bins, quantity="EM"):
@@ -449,6 +458,7 @@ if __name__ == "__main__":
     flm.read_2D_properties()
     flm.read_properties()
     flm.read_magnitude_gap(twodim=True)
+    convert_SZ_profiles()
     
     # stack_for_profiles()
     stack_for_Rsp()
