@@ -4,7 +4,9 @@ import splashback as sp
 
 plt.style.use("mnras.mplstyle")
     
-def bin_profiles(d, bins, list_of_names):
+def bin_profiles(d, bins, list_of_names,
+                 bootstrap=False,
+                 print_data=False):
     """
     Takes a given run object and bins the density profiles according to
     3 given bin arrays. Also calculates a best fit gradient, assuming that 
@@ -26,7 +28,14 @@ def bin_profiles(d, bins, list_of_names):
     """
     N_stack = bins.shape[0]
     for i in range(N_stack):
-        sp.stack_and_find_2D(d, list_of_names[i], bins[i,:])
+        sp.stack_and_find_2D(d, list_of_names[i], 
+                             bins[i,:], 
+                             bootstrap=bootstrap, 
+                             print_data=print_data)
+        sp.stack_and_find_3D(d, list_of_names[i], 
+                             bins[i,:], 
+                             bootstrap=bootstrap, 
+                             print_data=print_data)
         
 
 def convert_SZ_profiles():
@@ -339,8 +348,8 @@ def compare_best(data, mids):
     plt.text(0.45, 0.01, "$R_{\\rm{SP,DM}} / R_{\\rm{200m}}$", 
              transform=fig.transFigure)
     
-    # filename = "splashback_data/flamingo/plots/compare_Rsp_morph.png"
-    # plt.savefig(filename, dpi=300)
+    filename = "splashback_data/flamingo/plots/compare_Rsp_morph.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
     
     
@@ -445,6 +454,191 @@ def stack_for_Rsp():
     
     compare_best(flm, mids)
     
+    
+def plot_param_correlations(split, ax):
+    Rsp_EM = getattr(flm, "R_EM_"+split)
+    Rsp_SZ = getattr(flm, "R_SZ_"+split)
+    Rsp_WL = getattr(flm, "R_WL_"+split)
+    mids = getattr(flm, split+"_mid")
+    errors_EM = getattr(flm, "error_R_EM_"+split)
+    errors_SZ = getattr(flm, "error_R_SZ_"+split)
+    errors_WL = getattr(flm, "error_R_WL_"+split)
+    label_EM = "Emission measure"
+    label_SZ = "Compton-y"
+    label_WL = "Surface density"
+    
+    axes_labels = {
+        "mass": "$M_{\\rm{200m}}$",
+        "accretion": "$\Gamma$",
+        "energy": "$E_{\\rm{kin}}/E_{\\rm{therm}}$",
+        "symmetry": "$s$",
+        "centroid": "$\log \langle w \\rangle$",
+        "gap": "$M14$"}
+
+    if split == "mass":
+        ax.set_xscale('log')
+    ax.errorbar(mids, Rsp_EM, yerr=errors_EM, 
+                color="gold", label=label_EM, capsize=2)
+    ax.errorbar(mids, Rsp_SZ, yerr=errors_SZ, 
+                color="c", label=label_SZ, capsize=2)
+    ax.errorbar(mids, Rsp_WL, yerr=errors_WL, 
+                color="darkmagenta", label=label_WL, capsize=2)
+    ax.set_xlabel(axes_labels[split])
+
+    
+def stack_for_params():
+    N_bins = 10
+    mass_bins = np.linspace(14, 15.6, N_bins+1)
+    accretion_bins = np.linspace(0, 4.2, N_bins+1)
+    energy_bins = np.linspace(0.05, 0.35, N_bins+1)
+    s_bins = np.linspace(0.05, 1.4, N_bins+1)
+    w_bins = np.linspace(-2.7, -1, N_bins+1)
+    gap_bins = np.linspace(0,2.5, N_bins+1)
+    
+    bin_profiles(flm, np.vstack((accretion_bins, mass_bins, energy_bins,
+                                 s_bins, w_bins, gap_bins)), 
+                 ["accretion", "mass", "energy","symmetry", "centroid", "gap"],
+                 bootstrap=True)
+    flm.R_WL_accretion, flm.second_WL_accretion = sp.second_caustic(flm.R_WL_accretion, 
+                                                                    flm.second_WL_accretion)
+    
+    flm.mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
+    flm.accretion_mid = (accretion_bins[:-1] + accretion_bins[1:])/2
+    flm.energy_mid = (energy_bins[:-1] + energy_bins[1:])/2
+    flm.symmetry_mid = (s_bins[:-1] + s_bins[1:])/2
+    flm.centroid_mid = (w_bins[:-1] + w_bins[1:])/2
+    flm.gap_mid = (gap_bins[:-1] + gap_bins[1:])/2
+
+    fig, axes = plt.subplots(nrows=1, ncols=3, 
+                             sharey=True,
+                             figsize=(7,2),
+                             gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+    plot_param_correlations("mass", axes[1])
+    plot_param_correlations("accretion", axes[0])
+    plot_param_correlations("energy", axes[2])
+    axes[0].set_ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
+    axes[0].legend()
+    # ylim = axes[0].get_ylim()
+    # ylim = (0, ylim[1])
+    # axes[0].set_ylim(ylim)
+    plt.subplots_adjust(bottom=0.18)
+    filename = "splashback_data/flamingo/plots/parameter_dependence_2D.png"
+    plt.savefig(filename, dpi=300)
+    plt.show()
+    
+    fig, axes = plt.subplots(nrows=1, ncols=3, 
+                             sharey=True,
+                             figsize=(7,2),
+                             gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+    plot_param_correlations("symmetry", axes[1])
+    plot_param_correlations("centroid", axes[0])
+    plot_param_correlations("gap", axes[2])
+    axes[0].set_ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
+    axes[0].legend()
+    # ylim = axes[0].get_ylim()
+    # ylim = (0, ylim[1])
+    # axes[0].set_ylim(ylim)
+    plt.subplots_adjust(bottom=0.18)
+    filename = "splashback_data/flamingo/plots/obs_parameter_dependence_2D.png"
+    plt.savefig(filename, dpi=300)
+    plt.show()
+    
+    
+def bin_random(data, bins, split, N_clusters,
+               print_data=False):
+    if split == "mass":
+        split_name = "M200m"
+        split_data = np.log10(getattr(data, split_name))
+    else:
+        split_data = getattr(data, split)
+    N_profiles = 2
+        
+    
+    saving_strings = ["_P", "_SZ"]
+    pressure = data.gas_pressure_3D
+    SZ = data.SZ_median[:len(pressure)]
+    stacking_data = np.dstack((pressure, SZ))
+    
+    not_nan = np.where(np.isfinite(split_data)==True)[0]
+    #will return 0 or len for values outside the range
+    bins_sort = np.digitize(split_data[not_nan], bins)
+    N_bins = len(bins) - 1
+    stacked_data = np.zeros((N_bins, data.N_rad, N_profiles))
+    if print_data:
+        print("")
+        print(split)
+    for i in range(N_bins):
+        bin_mask = np.where(bins_sort == i+1)[0]
+        sample = np.random.choice(bin_mask, size=N_clusters, replace=False)
+        if print_data:
+            print(len(bin_mask))
+        for j in range(N_profiles):
+            stacked_data[i,:,j] = sp.stack_data(stacking_data[not_nan,:,j][sample,:])
+            
+    for i in range(N_profiles):
+        log = sp.log_gradients(data.rad_mid, stacked_data[:,:,i])
+        setattr(data, split+ "_profile" + saving_strings[i], stacked_data[:,:,i]) #previously density instead of profile
+        setattr(data, split+ "_log" + saving_strings[i], log)
+
+
+def stack_test():
+    N_bins = 4
+    mass_bins = np.linspace(14, 15.2, N_bins+1)
+    accretion_bins = np.linspace(0, 4, N_bins+1)
+    energy_bins = np.linspace(0.05, 0.35, N_bins+1)
+    
+    mass_cut(flm, np.array([14.5,15]), ["accretion", "SZ_median", "gas_pressure_3D"])
+    
+    bin_random(flm, accretion_bins, "accretion", 30, print_data=True) 
+                  
+    flm.mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
+    cm = plt.cm.autumn(np.linspace(0,0.95,N_bins))
+    plt.figure()
+    for i in range(N_bins):
+        plt.semilogx(flm.rad_mid, flm.accretion_log_P[i,:],
+                     color=cm[i])
+    plt.show()
+    plt.figure()
+    for i in range(N_bins):
+        plt.semilogx(flm.rad_mid, flm.accretion_log_SZ[i,:],
+                     color=cm[i])
+    plt.show()
+    
+    # plt.figure()
+    # plt.plot(flm.mass_mid, flm.R_P_mass, 
+    #               label="Pressure", color="b")
+    # plt.plot(flm.mass_mid, flm.R_SZ_mass, 
+    #               label="Compton-y", color="c")
+    # plt.plot(flm.mass_mid, flm.R_gas_mass, 
+    #               label="Gas density", color="r")
+    # plt.plot(flm.mass_mid, flm.R_EM_mass, 
+    #               label="emission measure", color="gold")
+    # plt.ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
+    # plt.legend()
+    # plt.xscale('log')
+    # # plt.subplots_adjust(bottom=0.18)
+    # # filename = "splashback_data/flamingo/plots/parameter_dependence_2D.png"
+    # # plt.savefig(filename, dpi=300)
+    # plt.show()
+    
+    # for index in range(10):
+    #     # gas_density = sp.log_gradients(flm.rad_mid, flm.gas_density_3D[index,:])
+    #     pressure = sp.log_gradients(flm.rad_mid, flm.gas_pressure_3D[index,:])
+    #     # EM = sp.log_gradients(flm.rad_mid, flm.EM_median[index,:])
+    #     SZ = sp.log_gradients(flm.rad_mid, flm.SZ_median[index,:])
+    #     plt.figure()
+    #     # plt.semilogx(flm.rad_mid, gas_density,
+    #     #          color="r", label="Gas density")
+    #     # plt.semilogx(flm.rad_mid, EM,
+    #     #          color="gold", label="Emission measure")
+    #     plt.semilogx(flm.rad_mid, pressure,
+    #              color="b", label="Pressure")
+    #     plt.semilogx(flm.rad_mid, SZ,
+    #              color="c", label="Compton-y")
+    #     plt.legend()
+    #     plt.ylim((-7,1))
+    #     plt.show()
+
 
 N_rad = 44
 log_radii = np.linspace(-1, 0.7, N_rad+1)
@@ -454,6 +648,7 @@ if __name__ == "__main__":
     box = "L1000N1800"
     
     flm = sp.flamingo(box, "HF")
+    flm.read_pressure()
     flm.read_2D()
     flm.read_2D_properties()
     flm.read_properties()
@@ -461,5 +656,7 @@ if __name__ == "__main__":
     convert_SZ_profiles()
     
     # stack_for_profiles()
-    stack_for_Rsp()
+    # stack_for_Rsp()
+    stack_for_params()
+    # stack_test()
     
