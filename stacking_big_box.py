@@ -135,9 +135,9 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
     bin_type = np.array(["accretion", "mass", "energy"])
     labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$E_{\\rm{kin}} / E_{\\rm{therm}}$"])
     N_bins = len(accretion_bins) - 1
-    ylim = (-4,0.5)
+    ylim = (-4.1,0.5)
     fig, ax = plt.subplots(nrows=3, ncols=2, 
-                           figsize=(4,6), 
+                           figsize=(4,5), 
                            sharey=True,
                            gridspec_kw={'hspace' : 0, 'wspace' : 0})
     cm1 = plt.cm.autumn(np.linspace(0,0.95,N_bins))
@@ -177,8 +177,8 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
     fig.text(0.48, 0.05, "$r/R_{\\rm{200m}}$", transform=fig.transFigure)
     ax[0,0].text(0.05, 0.07, "$\\rho=\\rho_{\\rm{DM}}$", transform=ax[0,0].transAxes)
     ax[0,1].text(0.05, 0.07, "$\\rho=\\rho_{\\rm{gas}}$", transform=ax[0,1].transAxes)
-    filename = "splashback_data/flamingo/plots/HF_compare_bins_all.png"
-    plt.savefig(filename, dpi=300)
+    # filename = "splashback_data/flamingo/plots/HF_compare_bins_all.png"
+    # plt.savefig(filename, dpi=300)
     plt.show()
 
     
@@ -249,28 +249,36 @@ def Rsp_model(accretion, model="More"):
     return Rsp
     
 
-def plot_param_correlations(split, ax):
-    Rsp_DM = getattr(flm, "R_DM_"+split)
-    Rsp_gas = getattr(flm, "R_gas_"+split)
+def plot_param_correlations(split, ax, plot="R"):
+    plot_DM = getattr(flm, plot+"_DM_"+split)
+    plot_gas = getattr(flm, plot+"_gas_"+split)
+    plot_pressure = getattr(flm, plot+"_P_"+split)
     mids = getattr(flm, split+"_mid")
-    errors_DM = getattr(flm, "error_R_"+split+"_DM")
-    errors_gas = getattr(flm, "error_R_"+split+"_gas")
-    label_DM = "Dark matter"
-    label_gas = "Gas"
+    errors_DM = getattr(flm, "error_"+plot+"_DM_"+split)
+    errors_gas = getattr(flm, "error_"+plot+"_gas_"+split)
+    errors_pressure = getattr(flm, "error_"+plot+"_P_"+split)
+    label_DM = "Dark matter density"
+    label_gas = "Gas density"
+    label_P = "Gas pressure"
     # plt.figure()
     if split == "mass":
         ax.set_xscale('log')
-    elif split == "accretion":
+    elif split == "accretion" and plot == "R":
         Rsp_more = Rsp_model(mids)
         Rsp_oneil = Rsp_model(mids, model="O'Neil")
         ax.plot(mids, Rsp_more, 
-                 color="darkmagenta", label="More 2015", linestyle="--")
+                  color="darkmagenta", label="More 2015", linestyle="--")
         ax.plot(mids, Rsp_oneil, 
-                 color="darkmagenta", label="O'Neil 2021", linestyle=":")
+                  color="darkmagenta", label="O'Neil 2021", linestyle=":")
         label_DM = "Data"
         label_gas = ""
-    ax.errorbar(mids, Rsp_DM, yerr=errors_DM, color="darkmagenta", label=label_DM)
-    ax.errorbar(mids, Rsp_gas, yerr=errors_gas, color="c", label=label_gas)
+        label_P = ""
+    ax.errorbar(mids, plot_DM, yerr=3*errors_DM, 
+                color="darkmagenta", label=label_DM, capsize=2)
+    ax.errorbar(mids, plot_gas, yerr=3*errors_gas, 
+                color="gold", label=label_gas, capsize=2)
+    ax.errorbar(mids, plot_pressure, yerr=3*errors_pressure, 
+                color="c", label=label_P, capsize=2)
     ax.set_xlabel(axes_labels[split])
     # plt.ylabel("$R_{\\rm{SP}} / R_{\\rm{200m}}$")
     # plt.legend()
@@ -327,7 +335,7 @@ def stack_for_params():
 
     fig, axes = plt.subplots(nrows=1, ncols=3, 
                              sharey=True,
-                             figsize=(7,3),
+                             figsize=(7,2.5),
                              gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
     plot_param_correlations("mass", axes[1])
     plot_param_correlations("accretion", axes[0])
@@ -335,7 +343,20 @@ def stack_for_params():
     axes[0].set_ylabel("$R_{\\rm{SP}} / R_{\\rm{200m}}$")
     axes[0].legend()
     axes[2].legend()
-    filename = "splashback_data/flamingo/plots/parameter_dependence.png"
+    filename = "splashback_data/flamingo/plots/parameter_dependence_R.png"
+    plt.savefig(filename, dpi=300)
+    plt.show()
+    
+    fig, axes = plt.subplots(nrows=1, ncols=3, 
+                             sharey=True,
+                             figsize=(7,2.5),
+                             gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+    plot_param_correlations("mass", axes[1], plot="depth")
+    plot_param_correlations("accretion", axes[0], plot="depth")
+    plot_param_correlations("energy", axes[2], plot="depth")
+    axes[0].set_ylabel("$\gamma_{\\rm{SP}}$")
+    axes[0].legend()
+    filename = "splashback_data/flamingo/plots/parameter_dependence_gamma.png"
     plt.savefig(filename, dpi=300)
     plt.show()
 
@@ -343,6 +364,7 @@ def stack_for_params():
 if __name__ == "__main__":
     flm = sp.flamingo(box, "HF")
     flm.read_properties()
+    flm.read_pressure()
     # flm.read_low_mass()
     
     # stack_for_profiles(flm)
