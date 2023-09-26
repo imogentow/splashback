@@ -322,7 +322,9 @@ def stack_and_find_3D(data, split, split_bins, bootstrap=False,
     setattr(data, "depth_gas_"+split, depth_gas)
     
 
-def stack_and_find_2D(data, split, split_bins):
+def stack_and_find_2D(data, split, split_bins, 
+                      bootstrap=False,
+                      print_data=False):
     """
     Stacks data using stack_3D_function. Uses new profiles to determine 
     splashback radius and depth of minima.
@@ -340,27 +342,40 @@ def stack_and_find_2D(data, split, split_bins):
         Bins to use to split stacking criteria.
 
     """
-    stack_fixed(data, split, split_bins, dim="2D")
+    stack_fixed(data, split, split_bins, dim="2D", 
+                bootstrap=bootstrap, print_data=print_data)
     log_EM = getattr(data, split+"_log_EM")
     log_SZ = getattr(data, split+"_log_SZ")
     log_WL = getattr(data, split+"_log_WL")
     
-    R_SP_EM, depth_EM = dr.depth_cut(data.rad_mid, log_EM, 
-                                     depth_value="y",
-                                     cut=-5)
-    R_SP_SZ, depth_SZ = dr.depth_cut(data.rad_mid, log_SZ, 
-                                     depth_value="y",
-                                     cut=-1)
-    R_SP_WL, depth_WL = dr.depth_cut(data.rad_mid, log_WL, 
-                                     depth_value="y",
-                                     cut=-1)
-    
+
+    R_SP_EM, second_EM, depth_EM, _ = dr.depth_cut(data.rad_mid, 
+                                                   log_EM, 
+                                                   cut=-4,
+                                                   depth_value="y",
+                                                   second_caustic="y")
     setattr(data, "R_EM_"+split, R_SP_EM)
     setattr(data, "depth_EM_"+split, depth_EM)
+    setattr(data, "second_EM_"+split, second_EM)
+    
+    R_SP_SZ, second_SZ, depth_SZ, _ = dr.depth_cut(data.rad_mid, 
+                                                   log_SZ, 
+                                                   cut=-2.5,
+                                                   depth_value="y",
+                                                   second_caustic="y")
     setattr(data, "R_SZ_"+split, R_SP_SZ)
     setattr(data, "depth_SZ_"+split, depth_SZ)
+    setattr(data, "second_SZ_"+split, second_SZ)
+    
+    R_SP_WL, second_WL, depth_WL, _ = dr.depth_cut(data.rad_mid, 
+                                                   log_WL, 
+                                                   cut=-1,
+                                                   depth_value="y",
+                                                   second_caustic="y")
     setattr(data, "R_WL_"+split, R_SP_WL)
     setattr(data, "depth_WL_"+split, depth_WL)
+    setattr(data, "second_WL_"+split, second_WL)
+    
     
 def second_caustic(Rsp, second):
     """
@@ -395,7 +410,7 @@ def bootstrap_errors(data, stacking_data, split, split_data, split_bins,
                      dim="3D"):
     if stacking_data.ndim != 3:
         stacking_data = stacking_data[:,:,np.newaxis]
-    N_bootstrap = 1000
+    N_bootstrap = 100
     N_profiles = stacking_data.shape[2] #CHECK INDEX
     not_nan = np.where(np.isfinite(split_data)==True)[0]
     bins_sort = np.digitize(split_data[not_nan], split_bins)
@@ -418,6 +433,7 @@ def bootstrap_errors(data, stacking_data, split, split_data, split_bins,
             log_sample = log_gradients(data.rad_mid, stacked_data[:,:,k])
             Rsp_sample, second, gamma, _ = dr.depth_cut(data.rad_mid, 
                                                         log_sample, 
+                                                        cut=-1,
                                                         second_caustic="y",
                                                         depth_value="y")
             if split == "accretion":
