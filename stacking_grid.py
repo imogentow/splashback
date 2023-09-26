@@ -151,7 +151,9 @@ def grid_plot_both(data, quantity, accretion_bins):
                         + r"$< \Gamma <$" \
                         + str(np.round(accretion_bins[i+1],2))
         ax[i,0].text(0.05, 0.05, plot_label, transform=ax[i,0].transAxes)
-    fig.text(0.02, 0.45, r"$d \log \rho_{\rm{gas}} / d \log r$",
+    ax[0,0].text(0.85, 0.06, "$\\rho_{\\rm{DM}}$", transform=ax[0,0].transAxes)
+    ax[0,1].text(0.85, 0.06, "$\\rho_{\\rm{gas}}$", transform=ax[0,1].transAxes)
+    fig.text(0.02, 0.45, r"$d \log \rho / d \log r$",
              transform=fig.transFigure, rotation='vertical')
     fig.text(0.45, 0.02, "$r/R_{\\rm{200m}}$",
              transform=fig.transFigure,)
