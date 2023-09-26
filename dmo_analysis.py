@@ -5,7 +5,7 @@ import determine_radius as dr
 
 plt.style.use("mnras.mplstyle")
 
-box = "L1000N1800"
+box = "L2800N5040"
 
 def dmo_stacking(data, split, split_bins, bootstrap="none"):
     if split == "mass":
@@ -36,8 +36,8 @@ def dmo_stacking(data, split, split_bins, bootstrap="none"):
     setattr(data, "depth_DM_"+split, depth_DM)
     
     if bootstrap != "none":
-        Rsp_error = sp.bootstrap_errors(data, data.DM_density_3D, split, split_data, split_bins)
-        setattr(data, "error_R_" + split + "_DM", Rsp_error[0,:])
+        Rsp_error, _ = sp.bootstrap_errors(data, data.DM_density_3D, split, split_data, split_bins)
+        setattr(data, "error_R_DM_"+split, Rsp_error[0,:])
     
 
 def second_caustic(data, split):
@@ -145,37 +145,54 @@ def compare_rsp(flm, dmo, bins):
     plt.show()
     
 def plot_difference(flm, dmo):
-    delta_accretion = (flm.R_DM_accretion - dmo.R_DM_accretion) 
-    acc_error = np.sqrt(flm.error_R_accretion_DM**2 + dmo.error_R_accretion_DM**2)
-    acc_error = np.sqrt((acc_error/delta_accretion)**2 + (flm.error_R_accretion_DM/ flm.R_DM_accretion)**2)
-    delta_accretion = delta_accretion / flm.R_DM_accretion
-    acc_error = acc_error * delta_accretion
-    print(acc_error)
+    delta_accretion = (flm.R_DM_accretion - dmo.R_DM_accretion)/ flm.R_DM_accretion
+    error1 = dmo.R_DM_accretion / flm.R_DM_accretion
+    error2 = dmo.error_R_DM_accretion / dmo.R_DM_accretion
+    error3 = flm.error_R_DM_accretion / flm.R_DM_accretion
+    acc_error = error1 * np.sqrt(error2**2 + error3**2)
+    weights_acc = 1 / acc_error**2
+    mean_acc = np.nansum(delta_accretion * weights_acc) / np.nansum(weights_acc)
     
-    delta_mass = (flm.R_DM_mass - dmo.R_DM_mass) 
-    mass_error = np.sqrt(flm.error_R_mass_DM**2 + dmo.error_R_mass_DM**2)
-    mass_error = np.sqrt((mass_error/delta_mass)**2 + (flm.error_R_mass_DM/ flm.R_DM_mass)**2)
-    delta_mass = delta_mass / flm.R_DM_mass
-    mass_error = mass_error * delta_mass
+    delta_mass = (flm.R_DM_mass - dmo.R_DM_mass) / flm.R_DM_mass
+    error1 = dmo.R_DM_mass / flm.R_DM_mass
+    error2 = dmo.error_R_DM_mass / dmo.R_DM_mass
+    error3 = flm.error_R_DM_mass / flm.R_DM_mass
+    mass_error = error1 * np.sqrt(error2**2 + error3**2)
+    weights_mass = 1 / mass_error**2
+    mean_mass = np.nansum(delta_mass * weights_mass) / np.nansum(weights_mass)
     
     fig, ax = plt.subplots(nrows=1, ncols=2, sharey=True,
                            gridspec_kw={'hspace' : 0, 'wspace' : 0},
-                           figsize=(4,3))
+                           figsize=(4,2.5))
     ax[0].errorbar(mass_mid, delta_mass, yerr=mass_error,
                    fmt="o",
                    color="cyan",
-                   capsize=3)
+                   capsize=2)
     ax[0].set_xscale('log')
-    ax[0].set_xlabel("$M_{\\rm{200m}}$")
+    xlim = ax[0].get_xlim()
+    ax[0].semilogx(xlim, (mean_mass, mean_mass),
+                   linestyle="--", color="grey",
+                   label="Weighted mean")
+    ax[0].semilogx(xlim, (0,0),
+                   color="k", label="Zero")
+    ax[0].set_xlim(xlim)
+    ax[0].set_xlabel("$M_{\\rm{200m}} / M_{\odot}$")
     ax[0].set_ylabel("$(R_{\\rm{SP,hydro}} - R_{\\rm{SP, DMO}}) / R_{\\rm{SP,hydro}}$")
+    ax[0].legend()
     
     ax[1].errorbar(accretion_mid, delta_accretion, yerr=acc_error,
                    fmt="o",
                    color="r",
-                   capsize=3)
+                   capsize=2)
+    xlim = ax[1].get_xlim()
+    ax[1].plot(xlim, (mean_acc, mean_acc), 
+               linestyle="--", color="grey")
+    ax[1].plot(xlim, (0,0),
+                   color="k")
+    ax[1].set_xlim(xlim)
     ax[1].set_xlabel("$\Gamma$")
-    # filename = "splashback_data/flamingo/plots/dmo_differences.png"
-    # plt.savefig(filename, dpi=300)
+    filename = "splashback_data/flamingo/plots/dmo_differences.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
     
     # fig, ax1 = plt.subplots(nrows=1, ncols=1)
