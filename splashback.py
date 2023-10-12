@@ -1,7 +1,6 @@
 """Read main data and do most common calculations."""
 
 import numpy as np
-from math import factorial
 import determine_radius as dr
 from scipy.signal import savgol_filter
 
@@ -106,7 +105,7 @@ class flamingo:
         
         
     def read_low_mass(self):
-        """Read low mass data when needed to save memory. Adds it to already
+        """Reads low mass data when needed. Adds it to already
         existing variables."""
         DM_density_3D_low = np.genfromtxt(self.path + "_3D_DM_density_low_mass_all.csv", 
                                           delimiter=",") #1e10Msol / (r/R200m)^3
@@ -130,6 +129,7 @@ class flamingo:
         self.DM_density_3D = np.vstack((self.DM_density_3D, DM_density_3D_low))
         self.M200m = np.hstack((self.M200m, M200m_low))
         self.accretion = np.hstack((self.accretion, accretion_low))
+       
         
     def read_magnitude_gap(self, twodim=False):
         magnitudes = np.genfromtxt(self.path + "_galaxy_magnitudes.csv", delimiter=",")
@@ -408,10 +408,36 @@ def second_caustic(Rsp, second):
 
 def bootstrap_errors(data, stacking_data, split, split_data, split_bins, 
                      dim="3D"):
+    """
+    Calculates errors on radius and depth of minima due to sampling bias.
+
+    Parameters
+    ----------
+    data : obj
+        Simulation object containing data
+    stacking_data : numpy array
+        Profiles to be sampled and then stacked.
+    split : str
+        Name of criteria used for the stacking.
+    split_data : array
+        Stacking criteria data.
+    split_bins : array
+        Edges of bins used for stacking.
+    dim : str, optional
+        Dimension of profiles, 2D or 3D. The default is "3D".
+
+    Returns
+    -------
+    Rsp_error : array, float
+        Sampling error on radius of minima.
+    depth_error : array, float
+        Sampling error on depth of minima.
+
+    """
     if stacking_data.ndim != 3:
         stacking_data = stacking_data[:,:,np.newaxis]
-    N_bootstrap = 100
-    N_profiles = stacking_data.shape[2] #CHECK INDEX
+    N_bootstrap = 250
+    N_profiles = stacking_data.shape[2]
     not_nan = np.where(np.isfinite(split_data)==True)[0]
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
@@ -441,6 +467,7 @@ def bootstrap_errors(data, stacking_data, split, split_data, split_bins,
             Rsp_error[k,i] = np.nanstd(Rsp_sample)
             depth_error[k,i] = np.nanstd(gamma)
     return Rsp_error, depth_error
+
 
 def stack_data(array):
     """
@@ -502,14 +529,15 @@ def log_gradients(radii, array, window=19, order=4, smooth=True):
         density = density[finite] #delete bad values in profiles
         temp_radii = radii[finite]
         
-        dlnrho_dlnr = np.gradient(np.log10(density), np.log10(temp_radii))
-        if smooth:
-            smoothed_array[i,finite] = savgol_filter(dlnrho_dlnr, window, order)
-        else:
-            smoothed_array[i,finite] = dlnrho_dlnr
+        try:
+            dlnrho_dlnr = np.gradient(np.log10(density), np.log10(temp_radii))
+            if smooth:
+                smoothed_array[i,finite] = savgol_filter(dlnrho_dlnr, window, order)
+            else:
+                smoothed_array[i,finite] = dlnrho_dlnr
+        except IndexError: #all nan values in profile
+            smoothed_array[i,:] = np.nan
     if N == 1:
         smoothed_array = smoothed_array.flatten()
         
     return smoothed_array
-
-
