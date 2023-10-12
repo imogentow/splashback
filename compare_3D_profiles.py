@@ -43,6 +43,7 @@ def plot_profiles():
     plt.savefig(filename, dpi=300)
     plt.show()
     
+    
 if __name__ == "__main__":
     box = "L1000N1800"
     
