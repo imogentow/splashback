@@ -121,7 +121,7 @@ def depth_cut(radii, array,
         R_sp[i] = x_interp[test_SP]
         depth[i] = y_interp[test_SP]
                     
-        if plot != "n":   
+        if plot:   
             # Looks at minima in distribution to check Rsp is chosen properly
             plt.figure()
             plt.semilogx(x_interp, y_interp, color="k")
@@ -134,12 +134,11 @@ def depth_cut(radii, array,
                         s=100)
             plt.xlabel("r/$R_{200m}$")
             plt.ylabel("$\mathrm{d} \log \\rho / \mathrm{d} \log r$")
-            plt.title(plot)
             plt.show()
     
-    if depth_value and second_caustic:
+    if depth_value and not second_caustic:
         return R_sp, depth #if looking for depth values, only gives deepest minima
-    elif depth_value and second_caustic:
+    elif not depth_value and second_caustic:
         return R_sp, secondary
     elif depth_value and second_caustic:
         return R_sp, secondary, depth, second_depth
