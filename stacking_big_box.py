@@ -1,32 +1,57 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import splashback as sp
+from scipy.optimize import curve_fit
 
 plt.style.use("mnras.mplstyle")
-
-box = "L2800N5040"
 
 axes_labels = {
     "mass": "$M_{\\rm{200m}}$",
     "accretion": "$\Gamma$",
-    "energy": "$E_{\\rm{kin}}/E_{\\rm{therm}}$"}
+    "energy": "$X_{\\rm{E}}$"}
 
-def bin_profiles(d, accretion_bins, mass_bins, energy_bins):
+
+def bin_profiles(data, accretion_bins, mass_bins, energy_bins):
     """
     Takes a given run object and bins the density profiles according to
     3 given bin arrays. 
-    
-    Inputs.
-    d: obj, run of choice
-    accretion_bins: array giving edge values of bins of accretion rate
-    mass_bins: array giving edge values of bins of mass
-    energy_bins: array giving edge values of bins of energy ratio.
+
+    Parameters
+    ----------
+    data : obj
+        Simulation data.
+    accretion_bins : array, float
+        Bin edges for stacking according to the accretion rate
+    mass_bins : array, float
+        Bin edges for stacking following the cluster mass
+    energy_bins : array. float
+        bin edges for stacking following the cluster's energy ratio
+
+    Returns
+    -------
+    None.
     """
-    sp.stack_and_find_3D(d, "accretion", accretion_bins, bootstrap="y")
-    sp.stack_and_find_3D(d, "mass", mass_bins, bootstrap="y")
-    sp.stack_and_find_3D(d, "energy", energy_bins, bootstrap="y")
+
+    sp.stack_and_find_3D(data, "accretion", accretion_bins, bootstrap=True)
+    sp.stack_and_find_3D(data, "mass", mass_bins, bootstrap=True)
+    sp.stack_and_find_3D(data, "energy", energy_bins, bootstrap=True)
+    
     
 def second_caustic(split):
+    """
+    Determines which minima is the splashback and which is the second 
+    caustic and saves the values accordingly
+
+    Parameters
+    ----------
+    split : string
+        Name of the criteria previously used to stack the profiles.
+
+    Returns
+    -------
+    None.
+
+    """
     second_all = getattr(flm, "2_DM_"+split)
     R_sp = getattr(flm, "R_DM_"+split)
     
@@ -40,74 +65,6 @@ def second_caustic(split):
             second_all[index] = smaller
     setattr(flm, "R_DM_"+split, R_sp)
     setattr(flm, "2_DM_"+split, second_all)
-    
-    
-def plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
-                               quantity="DM"):
-    """
-    Plots stacked profiles for one run to compare the effect of using different
-    stacking criteria to define the bins used to stack.
-
-    Parameters
-    ----------
-    flm : obj
-        Run data to plot
-    accretion_bins : array (N_bins-1)
-        Edge values of accretion rate bins used for labelling.
-    mass_bins : array (N_bins-1)
-        Edge values of mass bins used for labelling.
-    energy_bins : array (N_bins-1)
-        Edge values of energy ratio bins used for labelling.
-    quantity : str, optional
-        Either "gas" or "DM". Decides which density profiles to plot.
-        The default is "DM".
-
-    Returns
-    -------
-    None.
-
-    """
-    bins = np.vstack((accretion_bins, mass_bins, energy_bins))
-    bin_type = np.array(["accretion", "mass", "energy"])
-    labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$E_{\\rm{kin}} / E_{\\rm{therm}}$"])
-    N_bins = len(accretion_bins) - 1
-    ylim = (-4,0.5)
-    fig, ax = plt.subplots(nrows=3, ncols=1, 
-                           figsize=(3,6), 
-                           sharey=True,
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    cm1 = plt.cm.autumn(np.linspace(0,0.95,N_bins))
-    cm2 = plt.cm.winter(np.linspace(0,1,N_bins))
-    cm3 = plt.cm.copper(np.linspace(0,1,N_bins))
-    lw = 0.8
-    for i in range(N_bins):
-        for j in range(3):
-            if i == 0:
-                label = labels[j] + "$<$"  + str(np.round(bins[j,i+1],2))
-            elif i == N_bins-1:
-                label = labels[j] + "$>$" + str(np.round(bins[j,i],2))
-            else:
-                label = str(np.round(bins[j,i],2)) \
-                    + "$<$" + labels[j] + "$<$" \
-                    + str(np.round(bins[j,i+1],2))
-            if j == 0:
-                cm = cm1
-            elif j==1:
-                cm = cm2
-            else:
-                cm = cm3
-            ax[j].semilogx(flm.rad_mid, getattr(flm, bin_type[j] + "_log_" + quantity)[i,:], 
-                           color=cm[i], linewidth=lw,
-                           label=label)
-    ax[0].set_ylim(ylim)
-    ax[0].legend()
-    ax[1].legend()
-    ax[2].legend()
-    ax[2].set_xlabel("$r/R_{\\rm{200m}}$")
-    ax[1].set_ylabel(r"$d \log \rho_{{\rm{{{}}}}} / d \log r$".format(quantity))
-    filename = "splashback_data/flamingo/plots/HF_compare_bins_" + quantity + ".png"
-    # plt.savefig(filename, dpi=300)
-    plt.show()
     
     
 def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
@@ -133,7 +90,7 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
     """
     bins = np.vstack((accretion_bins, mass_bins, energy_bins))
     bin_type = np.array(["accretion", "mass", "energy"])
-    labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$E_{\\rm{kin}} / E_{\\rm{therm}}$"])
+    labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$X_{\\rm{E}}$"])
     N_bins = len(accretion_bins) - 1
     ylim = (-4.1,0.5)
     fig, ax = plt.subplots(nrows=3, ncols=2, 
@@ -177,79 +134,95 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
     fig.text(0.48, 0.05, "$r/R_{\\rm{200m}}$", transform=fig.transFigure)
     ax[0,0].text(0.05, 0.07, "$\\rho=\\rho_{\\rm{DM}}$", transform=ax[0,0].transAxes)
     ax[0,1].text(0.05, 0.07, "$\\rho=\\rho_{\\rm{gas}}$", transform=ax[0,1].transAxes)
-    # filename = "splashback_data/flamingo/plots/HF_compare_bins_all.png"
-    # plt.savefig(filename, dpi=300)
+    filename = "splashback_data/flamingo/plots/HF_compare_bins_all.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
 
-    
-def plot_Rsp_scatter(run, mids):
+
+def fit_model(accretion, a, b, c, d):
     """
-    Plots the scatter in the splashback radius values when comparing values 
-    from DM and gas density profiles. Only plots the data from one run.
-    Different symbols are used for different bin types.
+    Model to get splashback radius from accretion rate.
 
     Parameters
     ----------
-    run : obj
-        Run data to plot.
-    mids : array (3,N_bins-1)
-        Array giving mid points of bins used to stack for 3 stacking criteria.
+    accretion : float
+        Accretion rate values to use to estimate the splashback radius.
+    a : float
+        Fitting parameter.
+    b : float
+        Fitting parameter.
+    c : float
+        Fitting parameter.
+    d : float
+        Fitting parameter.
+
+    Returns
+    -------
+    Rsp : float
+        Predicted splashabck radius values.
+
+    """
+    omega_m = 0.307
+    Rsp = a * (1+b*omega_m) * (1+ c*np.exp(-1*accretion/d))
+    return Rsp
+
+
+def Rsp_model(accretion, model="More", ydata=[]):
+    """
+    Sorts which model paramters to use/fits the model to get the parameters
+    and then gets an estimate of the splashback radius.
+
+    Parameters
+    ----------
+    accretion : float
+        Accretion rate values to use to estimate the splashback radius
+    model : str, optional
+        Name of the model parameters to use in the model that predictes the 
+        splashback radius. The default is "More".
+    ydata : array, optional
+        If model=="mine", this is necessary to pass onto the fitting function.
+        The default is [].
+
+    Returns
+    -------
+    Rsp : float
+        Estimated splashback radius values.
+
+    """
+    more = [0.54, 0.53, 1.36, 3.04]
+    oneil = [0.8, 0.26, 1.14, 1.25]
+    if model == "O'Neil":
+        params = oneil    
+    elif model == "mine":
+        popt, pcov = curve_fit(fit_model, accretion, ydata,
+                               p0=oneil)
+        params = popt
+    else:
+        params = more
+    Rsp = fit_model(accretion, *params)
+    return Rsp
+    
+
+def plot_param_correlations(split, ax, plot="R"):
+    """
+    Plots one panel of a plot with relationship between a named stacking 
+    criteria and the obtained splashback radius.
+
+    Parameters
+    ----------
+    split : str
+        Name of the stacking criteria used to create the profile to plot.
+    ax : obj
+        Pyplot axes object.
+    plot : str, optional
+        Which value to plot on the y-axis. Either "R" for the splashback radius
+        or "depth" to plot the depth of the feature. The default is "R".
 
     Returns
     -------
     None.
 
     """
-    xlim = np.array([0.7,1.4])
-    ylim = (0.87,1.2)
-    fig, axes = plt.subplots(nrows=1, ncols=1)
-    cm1 = plt.cm.get_cmap('autumn')
-    cm2 = plt.cm.get_cmap('winter')
-    cm3 = plt.cm.get_cmap('copper')
-    axes.plot(xlim, xlim, color="k")
-    crange1 = axes.scatter(run.R_DM_accretion, run.R_gas_accretion, 
-                           c=mids[0,:], edgecolor="k", 
-                           cmap=cm1, s=75, marker="o",
-                           label="Accretion rate")
-    crange2 = axes.scatter(run.R_DM_mass, run.R_gas_mass, 
-                          c=mids[1,:], edgecolor="k", 
-                          cmap=cm2, s=75, marker="*",
-                          label="Mass")
-    crange3 = axes.scatter(run.R_DM_energy, run.R_gas_energy, 
-                           c=mids[2,:], edgecolor="k", 
-                           cmap=cm3, s=75, marker="v",
-                           label="Energy ratio")
-    # plt.xlabel(r"$R_{\rm{SP,DM}} / R_{\rm{200m}}$")
-    # plt.ylabel(r"$R_{\rm{SP,gas}} / R_{\rm{200m}}$")
-    axes.legend(loc='upper left')
-    axes.set_xlim(xlim)
-    axes.set_ylim(ylim)
-    plt.xlabel("$R_{\\rm{SP,DM}}$")
-    plt.ylabel("$R_{\\rm{SP,gas}}$")
-    cbaxes1 = fig.add_axes([0.185, 0.68, 0.02, 0.1]) 
-    cbar = fig.colorbar(crange1, cax=cbaxes1, label="$\Gamma$")
-    cbaxes2 = fig.add_axes([0.185, 0.53, 0.02, 0.1]) 
-    cbar = fig.colorbar(crange2, cax=cbaxes2, label="$\log M_{\\rm{200m}}$")
-    cbaxes3 = fig.add_axes([0.1855, 0.38, 0.02, 0.1]) 
-    cbar = fig.colorbar(crange3, cax=cbaxes3, label="$E_{\\rm{kin}}/E_{\\rm{therm}}$")
-    # filename = "compare_bins_HF.png"
-    # plt.savefig(filename, dpi=300)
-    plt.show()
-    
-
-def Rsp_model(accretion, model="More"):
-    more = [0.54, 0.53, 1.36, 3.04]
-    oneil = [0.8, 0.26, 1.14, 1.25]
-    omega_m = 0.307
-    if model == "O'Neil":
-        params = oneil
-    else:
-        params = more
-    Rsp = params[0] * (1+params[1]*omega_m) * (1+ params[2]*np.exp(-1*accretion/params[3]))
-    return Rsp
-    
-
-def plot_param_correlations(split, ax, plot="R"):
     plot_DM = getattr(flm, plot+"_DM_"+split)
     plot_gas = getattr(flm, plot+"_gas_"+split)
     plot_pressure = getattr(flm, plot+"_P_"+split)
@@ -266,6 +239,7 @@ def plot_param_correlations(split, ax, plot="R"):
     elif split == "accretion" and plot == "R":
         Rsp_more = Rsp_model(mids)
         Rsp_oneil = Rsp_model(mids, model="O'Neil")
+        Rsp_mine = Rsp_model(mids, model="mine", ydata=plot_DM)
         ax.plot(mids, Rsp_more, 
                   color="darkmagenta", label="More 2015", linestyle="--")
         ax.plot(mids, Rsp_oneil, 
@@ -280,11 +254,22 @@ def plot_param_correlations(split, ax, plot="R"):
     ax.errorbar(mids, plot_pressure, yerr=3*errors_pressure, 
                 color="c", label=label_P, capsize=2)
     ax.set_xlabel(axes_labels[split])
-    # plt.ylabel("$R_{\\rm{SP}} / R_{\\rm{200m}}$")
-    # plt.legend()
-    # plt.show()
+    
     
 def stack_for_profiles(flm):
+    """
+    Defines bins and then plots 3D density profiles.
+
+    Parameters
+    ----------
+    flm : obj
+        Simulation data.
+
+    Returns
+    -------
+    None.
+
+    """
     N_bins = 4
     mass_bins = np.linspace(14, 15, N_bins+1)
     mass_bins = np.append(mass_bins, 16)
@@ -294,33 +279,20 @@ def stack_for_profiles(flm):
     energy_bins = np.append(energy_bins, 1)
     bin_profiles(flm, accretion_bins, mass_bins, energy_bins)
     
-    # plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
-    #                            quantity="DM")
-    # plot_profiles_compare_bins(flm, accretion_bins, mass_bins, energy_bins,
-    #                            quantity="gas")
     plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins)
-    
-def stack_for_scatter_Rsp():
-    N_bins = 20
-    mass_bins = np.linspace(14,
-                            np.nanpercentile(np.log10(flm.M200m), 99),
-                            N_bins+1)
-    accretion_bins = np.linspace(0, 
-                                 np.nanpercentile(flm.accretion[np.isfinite(flm.accretion)], 99), 
-                                 N_bins+1)
-    energy_bins = np.linspace(np.min(flm.energy), 
-                              np.nanpercentile(flm.energy, 99), 
-                              N_bins+1)
-    bin_profiles(flm, accretion_bins, mass_bins, energy_bins)
-    flm.mass_mid = (mass_bins[:-1] + mass_bins[1:])/2
-    flm.accretion_mid = (accretion_bins[:-1] + accretion_bins[1:])/2
-    flm.energy_mid = (energy_bins[:-1] + energy_bins[1:])/2
-    mids = np.vstack((flm.accretion_mid, flm.mass_mid, flm.energy_mid))
-
-    plot_Rsp_scatter(flm, mids)
     
     
 def stack_for_params():
+    """
+    Defines bins and then plots relationship between the different stacking 
+    criteria used to stack the profiles and either the radius or depth of the 
+    splashback feature.
+
+    Returns
+    -------
+    None.
+
+    """
     N_bins = 10
     mass_bins = np.linspace(14, 15.6, N_bins+1)
     accretion_bins = np.linspace(0, 4.2, N_bins+1)
@@ -334,39 +306,40 @@ def stack_for_params():
     flm.energy_mid = (energy_bins[:-1] + energy_bins[1:])/2
 
     fig, axes = plt.subplots(nrows=1, ncols=3, 
-                             sharey=True,
-                             figsize=(7,2.5),
-                             gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+                              sharey=True,
+                              figsize=(7,2),
+                              gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
     plot_param_correlations("mass", axes[1])
     plot_param_correlations("accretion", axes[0])
     plot_param_correlations("energy", axes[2])
     axes[0].set_ylabel("$R_{\\rm{SP}} / R_{\\rm{200m}}$")
     axes[0].legend()
     axes[2].legend()
+    plt.subplots_adjust(bottom=0.18)
     filename = "splashback_data/flamingo/plots/parameter_dependence_R.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
     fig, axes = plt.subplots(nrows=1, ncols=3, 
-                             sharey=True,
-                             figsize=(7,2.5),
-                             gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+                              sharey=True,
+                              figsize=(7,2),
+                              gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
     plot_param_correlations("mass", axes[1], plot="depth")
     plot_param_correlations("accretion", axes[0], plot="depth")
     plot_param_correlations("energy", axes[2], plot="depth")
     axes[0].set_ylabel("$\gamma_{\\rm{SP}}$")
     axes[0].legend()
+    plt.subplots_adjust(bottom=0.18)
     filename = "splashback_data/flamingo/plots/parameter_dependence_gamma.png"
     plt.savefig(filename, dpi=300)
     plt.show()
 
 
 if __name__ == "__main__":
+    box = "L2800N5040"
     flm = sp.flamingo(box, "HF")
     flm.read_properties()
     flm.read_pressure()
-    # flm.read_low_mass()
     
     # stack_for_profiles(flm)
-    # stack_for_scatter_Rsp()
     stack_for_params()
