@@ -7,7 +7,27 @@ plt.style.use("mnras.mplstyle")
 
 box = "L2800N5040"
 
-def dmo_stacking(data, split, split_bins, bootstrap="none"):
+def dmo_stacking(data, split, split_bins, bootstrap=False):
+    """
+    Stacks dark matter only profiles.
+
+    Parameters
+    ----------
+    data : obj
+        Simulation data class.
+    split : string
+        Name of criteria to use for stacking.
+    split_bins : array
+        Bin edges for stacking criteria.
+    bootstrap : bool, optional
+        Whether to calculate sampling errors on the location of the minima.
+        The default is False.
+
+    Returns
+    -------
+    None.
+
+    """
     if split == "mass":
         split_data = np.log10(data.M200m)
     else:
@@ -18,10 +38,8 @@ def dmo_stacking(data, split, split_bins, bootstrap="none"):
     bins_sort = np.digitize(split_data[not_nan], split_bins)
     N_bins = len(split_bins) - 1
     stacked_data = np.zeros((N_bins, data.N_rad))
-    print("")
     for i in range(N_bins):
         bin_mask = np.where(bins_sort == i+1)[0]
-        print(len(bin_mask))
         stacked_data[i,:] = sp.stack_data(data.DM_density_3D[not_nan,:][bin_mask,:])
             
     log = sp.log_gradients(data.rad_mid, stacked_data)
@@ -35,12 +53,28 @@ def dmo_stacking(data, split, split_bins, bootstrap="none"):
     setattr(data, "2_DM_"+split, second)
     setattr(data, "depth_DM_"+split, depth_DM)
     
-    if bootstrap != "none":
+    if bootstrap:
         Rsp_error, _ = sp.bootstrap_errors(data, data.DM_density_3D, split, split_data, split_bins)
         setattr(data, "error_R_DM_"+split, Rsp_error[0,:])
     
 
 def second_caustic(data, split):
+    """
+    Identifies which minima is the second caustic and splashback radius in
+    dark matter profiles.
+
+    Parameters
+    ----------
+    data : obj
+        Simulation data.
+    split : str
+        Name of criteria used for profile stacking.
+
+    Returns
+    -------
+    None.
+
+    """
     second_all = getattr(data, "2_DM_"+split)
     R_sp = getattr(data, "R_DM_"+split)
     
@@ -125,7 +159,23 @@ def plot_profiles(flm, dmo, bins):
     plt.savefig(filename, dpi=300)
     plt.show()
     
-def compare_rsp(flm, dmo, bins):
+    
+def compare_rsp(flm, dmo):
+    """
+    Compares locations of minima in dark matter only and hydro runs.
+
+    Parameters
+    ----------
+    flm : obj
+        Hydro simulation data.
+    dmo : obj
+        Dark matter only simulation data.
+
+    Returns
+    -------
+    None.
+
+    """
     fig, ax = plt.subplots(nrows=1, ncols=1)
     ax.scatter(flm.R_DM_accretion, dmo.R_DM_accretion,
                edgecolor="k", marker="o", color="red", s=75,
@@ -144,7 +194,24 @@ def compare_rsp(flm, dmo, bins):
     # plt.savefig("splashback_data/flamingo/plots/dmo_v_hydro_rsp.png", dpi=300)
     plt.show()
     
+    
 def plot_difference(flm, dmo):
+    """
+    Plots differences between the minima in hydro and dark matter only 
+    simulations.
+
+    Parameters
+    ----------
+    flm : obj
+        Hydro simulation data.
+    dmo : TYPE
+        Dark matter only simulation data.
+
+    Returns
+    -------
+    None.
+
+    """
     delta_accretion = (flm.R_DM_accretion - dmo.R_DM_accretion)/ flm.R_DM_accretion
     error1 = dmo.R_DM_accretion / flm.R_DM_accretion
     error2 = dmo.error_R_DM_accretion / dmo.R_DM_accretion
@@ -171,49 +238,34 @@ def plot_difference(flm, dmo):
     ax[0].set_xscale('log')
     xlim = ax[0].get_xlim()
     ax[0].semilogx(xlim, (mean_mass, mean_mass),
-                   linestyle="--", color="grey",
-                   label="Weighted mean")
+                    linestyle="--", color="grey",
+                    label="Weighted mean")
     ax[0].semilogx(xlim, (0,0),
-                   color="k", label="Zero")
+                    color="k", label="Zero")
     ax[0].set_xlim(xlim)
     ax[0].set_xlabel("$M_{\\rm{200m}} / M_{\odot}$")
     ax[0].set_ylabel("$(R_{\\rm{SP,hydro}} - R_{\\rm{SP, DMO}}) / R_{\\rm{SP,hydro}}$")
     ax[0].legend()
     
-    ax[1].errorbar(accretion_mid, delta_accretion, yerr=acc_error,
+    ax[1].plot(accretion_mid, delta_accretion, yerr=acc_error,
                    fmt="o",
                    color="r",
                    capsize=2)
     xlim = ax[1].get_xlim()
     ax[1].plot(xlim, (mean_acc, mean_acc), 
-               linestyle="--", color="grey")
+                linestyle="--", color="grey")
     ax[1].plot(xlim, (0,0),
-                   color="k")
+                    color="k")
     ax[1].set_xlim(xlim)
     ax[1].set_xlabel("$\Gamma$")
     filename = "splashback_data/flamingo/plots/dmo_differences.png"
     plt.savefig(filename, dpi=300)
     plt.show()
-    
-    # fig, ax1 = plt.subplots(nrows=1, ncols=1)
-    # ax2 = ax1.twiny() #shares y axis
-    # ax1.scatter(mass_mid, delta_mass, 
-    #             color="cyan")
-    # ax1.set_xscale('log')
-    # ax1.set_xlabel("$M_{\\rm{200m}}$")
-    # ax1.set_ylabel("$(R_{\\rm{SP,hydro}} - R_{\\rm{SP, DMO}}) / R_{\\rm{SP,hydro}}$")
-    
-    # ax2.scatter(accretion_mid, delta_accretion, 
-    #             color="r")
-    # ax2.set_xlabel("$\Gamma$")
-    # plt.show()
 
 dmo = sp.flamingo(box, "DMO")
 dmo.read_properties()
-# dmo.read_low_mass()
 flm = sp.flamingo(box, "HF")
 flm.read_properties()
-# flm.read_low_mass()
 
 N_bins = 10
 mass_bins = np.linspace(14, 15.4, N_bins+1)
@@ -222,10 +274,10 @@ mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
 accretion_mid = (accretion_bins[:-1] + accretion_bins[1:])/2
 bins = np.vstack((accretion_bins, mass_bins))
 
-sp.stack_and_find_3D(flm, "accretion", accretion_bins, bootstrap="y")
-sp.stack_and_find_3D(flm, "mass", mass_bins, bootstrap="y")
-dmo_stacking(dmo, "accretion", accretion_bins, bootstrap="y")
-dmo_stacking(dmo, "mass", mass_bins, bootstrap="y")
+sp.stack_and_find_3D(flm, "accretion", accretion_bins, bootstrap=False)
+sp.stack_and_find_3D(flm, "mass", mass_bins, bootstrap=False)
+dmo_stacking(dmo, "accretion", accretion_bins, bootstrap=False)
+dmo_stacking(dmo, "mass", mass_bins, bootstrap=False)
 second_caustic(dmo, "accretion")
 second_caustic(flm, "accretion")
 
