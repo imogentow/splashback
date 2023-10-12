@@ -6,8 +6,11 @@ splashback_data/
 __pycache__/
 .ipynb_checkpoints/
 
+# Style sheet
+mnras.mplstyle
+
 # Temporary test code
 splashback_temp.py
 
-#Unrelevant mini project
+# Irrelevant mini project
 accretion_rate_prediction.ipynb
