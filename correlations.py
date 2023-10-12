@@ -8,32 +8,15 @@ plt.style.use("mnras.mplstyle")
 flm = sp.flamingo(box, "HF")
 flm.read_2D_properties()
 flm.read_properties()
+flm.read_magnitude_gap(twodim=True)
 
-mask = np.intersect1d(np.where(np.isfinite(flm.M200m))[0],
-                      np.where(np.isfinite(flm.accretion))[0])
-print(np.corrcoef(flm.M200m[mask], flm.accretion[mask]))
-
-# flm.sphericity_gas = np.genfromtxt(flm.path + "_sphericity_gas.csv",
-#                                 delimiter=",")
-# flm.sphericity_DM = np.genfromtxt(flm.path + "_sphericity_DM.csv",
-#                                 delimiter=",")
-
-magnitudes = np.genfromtxt(flm.path + "_galaxy_magnitudes.csv", delimiter=",")
-sorted_magnitudes = np.sort(magnitudes)
-mag_bcg = sorted_magnitudes[:,0]
-mag_fourth = sorted_magnitudes[:,2]
-flm.gap = mag_fourth - mag_bcg
-
+# Expand arrays so they correspond to each projection
 M200m_xyz = np.hstack((flm.M200m, flm.M200m, flm.M200m))
 accretion_xyz = np.hstack((flm.accretion, flm.accretion, flm.accretion))
 energy_xyz = np.hstack((flm.energy, flm.energy, flm.energy))
-# Sgas_xyz = np.hstack((flm.sphericity_gas, flm.sphericity_gas, flm.sphericity_gas))
-# SDM_xyz = np.hstack((flm.sphericity_DM, flm.sphericity_DM, flm.sphericity_DM))
-M14_xyz = np.hstack((flm.gap, flm.gap, flm.gap))
 
-properties_all = np.vstack((accretion_xyz, M200m_xyz, energy_xyz,
-                            # Sgas_xyz, SDM_xyz, 
-                            M14_xyz, flm.concentration,
+properties_all = np.vstack((accretion_xyz, M200m_xyz, energy_xyz, 
+                            flm.gap, flm.concentration,
                             flm.symmetry, flm.alignment, flm.centroid))
 
 list_good1 = np.intersect1d(
@@ -51,8 +34,7 @@ properties_all = properties_all[:,list_good]
 
 correlations_p = np.corrcoef(properties_all)
 
-labels = ["$\Gamma$", "$M_{\\rm{200m}}$", "$E_{\\rm{kin}}/E_{\\rm{therm}}$",
-          # "$S_{\\rm{gas}}$", "$S_{\\rm{DM}}$", 
+labels = ["$\Gamma$", "$M_{\\rm{200m}}$", "$X_{\\rm{E}}$",
           "$\\rm{M14}$", "$c$", "$s$", "$a$",
           r"$\log\langle w \rangle$"]
 
