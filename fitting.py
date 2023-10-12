@@ -15,13 +15,36 @@ rho_crit = rho_crit / unit_converter
 
 def log_grad_model(log_radii, rho_s, r_s, r_t, alpha, beta, gamma, b_e, S_e):
     """
-    Density model from O'Neil et al 2021
-    
-    radii needs to be given in r/R200m
-    rho_s, r_s, r_t, alpha, beta, gamma, b_e, S_e are free parameters to be fit
-    
-    returns density model
+    Density model from DK14.
+
+    Parameters
+    ----------
+    log_radii : array
+        Log radii of profiles, given in r/R200m.
+    rho_s : str
+        Fitting parameter.
+    r_s : str
+        Fitting parameter.
+    r_t : str
+        Fitting parameter.
+    alpha : str
+        Fitting parameter.
+    beta : str
+        Fitting parameter.
+    gamma : str
+        Fitting parameter.
+    b_e : str
+        Fitting parameter.
+    S_e : str
+        Fitting parameter.
+
+    Returns
+    -------
+    log_grad : array
+        Log-gradient of profiles.
+
     """
+
     rho_s = 10**rho_s
     radii = 10**log_radii
     rho_m = 0.307 * rho_crit
@@ -35,12 +58,32 @@ def log_grad_model(log_radii, rho_s, r_s, r_t, alpha, beta, gamma, b_e, S_e):
 
 def density_model(log_radii, rho_s, r_s, r_t, alpha, beta, gamma, b_e, S_e):
     """
-    Density model from O'Neil et al 2021
-    
-    radii needs to be given in r/R200m
-    rho_s, r_s, r_t, alpha, beta, gamma, b_e, S_e are free parameters to be fit
-    
-    returns density model
+    DK14 density model.
+
+    log_radii : array
+        Log radii of profiles, given in r/R200m.
+    rho_s : str
+        Fitting parameter.
+    r_s : str
+        Fitting parameter.
+    r_t : str
+        Fitting parameter.
+    alpha : str
+        Fitting parameter.
+    beta : str
+        Fitting parameter.
+    gamma : str
+        Fitting parameter.
+    b_e : str
+        Fitting parameter.
+    S_e : str
+        Fitting parameter.
+
+    Returns
+    -------
+    log_density : array
+        Density from parameters.
+
     """
     rho_s = 10**rho_s
     radii = 10**log_radii
@@ -49,11 +92,29 @@ def density_model(log_radii, rho_s, r_s, r_t, alpha, beta, gamma, b_e, S_e):
     f_trans = (1 + (radii/r_t)**beta)**(-gamma/beta)
     rho_outer = rho_m * (b_e * (radii/5)**(-1*S_e) + 1)
     rho_total = rho_inner * f_trans + rho_outer
-    
-    return np.log10(rho_total)
+    log_density = np.log10(rho_total)
+    return log_density
 
 
 def fit_log_models(flm, split, bootstrap=False):
+    """
+    Fits models to 
+
+    Parameters
+    ----------
+    flm : TYPE
+        DESCRIPTION.
+    split : TYPE
+        DESCRIPTION.
+    bootstrap : TYPE, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    params : TYPE
+        DESCRIPTION.
+
+    """
     
     profile = getattr(flm, split+"_profile_DM")
     log_profile = getattr(flm, split+"_log_DM")
@@ -76,6 +137,22 @@ def fit_log_models(flm, split, bootstrap=False):
 
 
 def project_model(radii, params):
+    """
+    Uses density profile parameters to get a projected density profile.
+
+    Parameters
+    ----------
+    radii : array, float
+        Radii to find profile for.
+    params : array, float
+        Fitted parameters for profile
+
+    Returns
+    -------
+    projected_density : array, float
+        Projected density profile
+
+    """
     R_max = 5
     N_rad = len(radii)
     N_bins = np.shape(params)[0]
@@ -129,6 +206,23 @@ def find_sort_R(flm, radii, array, names, plot="n"):
     
     
 def bootstrap_errors(data, split):
+    """
+    Calculates sampling error of splashback radius from fitted and projected
+    dark matter density profiles.
+
+    Parameters
+    ----------
+    data : obj
+        simulation data
+    split : str
+        Name of criteria used to stack the profiles.
+
+    Returns
+    -------
+    Rsp_error : array, float
+        Error values for splashback radius from projected density profiles.
+
+    """
     stacking_data = data.DM_density_3D
     if split == "mass":
         split_data = np.log10(data.M200m)
@@ -164,14 +258,5 @@ def bootstrap_errors(data, split):
         # #Projected splashback model from 3D
         R_model = find_sort_R(data, data.rad_mid, projected_model_log_DM, 
                               ["model", split])
-        ###############
-        # Rsp_sample, second, gamma, _ = dr.depth_cut(data.rad_mid, 
-        #                                             log_sample, 
-        #                                             cut=-1,
-        #                                             second_caustic="y",
-        #                                             depth_value="y")
-        # if split == "accretion":
-        #     Rsp_sample, _ = sp.second_caustic(Rsp_sample, second)
         Rsp_error[i] = np.nanstd(R_model)
-        #depth_error[i] = np.nanstd(gamma)
-    return Rsp_error#, depth_error
+    return Rsp_error
