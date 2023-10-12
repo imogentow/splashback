@@ -7,28 +7,18 @@ plt.style.use("mnras.mplstyle")
 
 box = "L1000N1800"
 flm = sp.flamingo(box, "HF")
-
-N_bins = 45
-log_radii = np.linspace(-1, 0.7, N_bins)
-rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
-
-log_DM_density = sp.log_gradients(rad_mid, flm.DM_density_3D)
-log_gas_density = sp.log_gradients(rad_mid, flm.gas_density_3D)
-
 flm.read_properties()
 flm.read_2D_properties()
+flm.read_magnitude_gap()
+
+log_DM_density = sp.log_gradients(flm.rad_mid, flm.DM_density_3D)
+log_gas_density = sp.log_gradients(flm.rad_mid, flm.gas_density_3D)
 
 N_clusters = len(flm.M200m)
 flm.concentration = flm.concentration[:N_clusters]
 flm.symmetry = flm.symmetry[:N_clusters]
 flm.alignment = flm.alignment[:N_clusters]
 flm.centroid = flm.centroid[:N_clusters]
-
-magnitudes = np.genfromtxt(flm.path + "_galaxy_magnitudes.csv", delimiter=",")
-sorted_magnitudes = np.sort(magnitudes)
-mag_bcg = sorted_magnitudes[:,0]
-mag_fourth = sorted_magnitudes[:,2]
-flm.gap = mag_fourth - mag_bcg
 
 properties_all = np.vstack((np.log10(flm.M200m), flm.accretion, flm.energy, flm.gap,
                        flm.concentration, flm.symmetry, flm.alignment, flm.centroid))
@@ -44,7 +34,7 @@ list_good2 = np.intersect1d(
 list_good = np.intersect1d(list_good1, list_good2)
 
 plot_data = properties_all[:,list_good].T
-labels = [r'$\log M_{\rm{200m}}$', r'$\Gamma$', r'$E_{\rm{kin}}/E_{\rm{therm}}$',
+labels = [r'$\log M_{\rm{200m}}$', r'$\Gamma$', r'$X_{\rm{E}}$',
             '$M14$', '$c$', '$s$', '$a$', '$\log \langle w \\rangle$']
 N_properties = len(labels)
 
@@ -102,11 +92,6 @@ for i in range(N_properties-4):
     ax[i+4,4].set_xlim(c_lim)
     ax[N_properties-4,i].set_ylim(c_lim)
 
-# ax[4,4].set_xlim(c_lim)
-# ax[5,4].set_xlim(c_lim)
-# ax[6,4].set_xlim(c_lim)
-# ax[7,4].set_xlim(c_lim)
-
 ax[5,5].set_xlim(s_lim)
 ax[6,5].set_xlim(s_lim)
 ax[7,5].set_xlim(s_lim)
@@ -125,7 +110,7 @@ ax[3,0].set_ylim(mag_lim)
 ax[3,1].set_ylim(mag_lim)
 ax[3,2].set_ylim(mag_lim)
 
-plt.subplots_adjust(left=0.08, bottom=0.08)
+plt.subplots_adjust(left=0.1, bottom=0.1)
 plt.savefig('splashback_data/flamingo/plots/cornerplot.png')
 plt.show()
 
