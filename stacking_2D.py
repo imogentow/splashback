@@ -1,16 +1,32 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import splashback as sp
+import fitting as ft
 
 plt.style.use("mnras.mplstyle")
+H0 = 67.77 * 1000 / 3.09e22
+G = 6.67e-11
+rho_crit = 3 * H0**2 / (8 * np.pi * G) #kg/m^3
+unit_converter = 1.99e30 / (3.09e22**3)
+rho_crit = rho_crit / unit_converter
+
+axes_labels = {
+    "mass": "$M_{\\rm{200m}}$",
+    "accretion": "$\Gamma$",
+    "energy": "$X_{\\rm{E}}$",
+    "concentration": "$c$",
+    "symmetry": "$s$",
+    "alignment": "$a$",
+    "centroid": "$\langle w \\rangle$",
+    "gap": "$M14$"}
     
+
 def bin_profiles(d, bins, list_of_names,
                  bootstrap=False,
                  print_data=False):
     """
     Takes a given run object and bins the density profiles according to
-    3 given bin arrays. Also calculates a best fit gradient, assuming that 
-    the line goes through the origin.
+    given bin arrays. 
     
     Parameters
     ----------
@@ -39,6 +55,15 @@ def bin_profiles(d, bins, list_of_names,
         
 
 def convert_SZ_profiles():
+    """
+    Original data didn't account for changing bin sizes used to measure SZ
+    profiles, this fixes that.
+
+    Returns
+    -------
+    None.
+
+    """
     radii = np.logspace(-1, 0.7, 45)
     R200m = np.genfromtxt(flm.path+"_R200m.csv", delimiter=",")
     area = np.pi * (radii[1:]**2 - radii[:-1]**2) * 10 / 50 #in R200m not mpc
@@ -47,347 +72,60 @@ def convert_SZ_profiles():
     flm.SZ_median = flm.SZ_median / area
     
     
-def plot_profiles_compare_bins(flm, bins, quantity="EM"):
+def plot_observables(data, bins, bin_type):
     """
-    Plots stacked profiles for one run to compare the effect of using different
-    stacking criteria to define the bins used to stack.
+    Plots projected profiles according to a given bin.
 
     Parameters
     ----------
-    flm : obj
-        Run data to plot
-    accretion_bins : array (N_bins-1)
-        Edge values of accretion rate bins used for labelling.
-    mass_bins : array (N_bins-1)
-        Edge values of mass bins used for labelling.
-    energy_bins : array (N_bins-1)
-        Edge values of energy ratio bins used for labelling.
-    quantity : str, optional
-        Either "gas" or "DM". Decides which density profiles to plot.
-        The default is "DM".
+    data : obj
+        Simulation data.
+    bins : floats
+        2d array, each row lists bin edges used for previously stacking 
+        profiles.
+    bin_type : list, str
+        Names of criteria used to stack profiles previously. In an order 
+        matching order of bins.
 
     Returns
     -------
     None.
 
     """
-    bin_type = np.array(["accretion", "mass", "energy"])
-    labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$E_{\\rm{kin}} / E_{\\rm{therm}}$"])
     N_bins = bins.shape[1] - 1
-    ylim = (-4,0.5)
-    fig, ax = plt.subplots(nrows=3, ncols=1, 
-                           figsize=(3,6), 
-                           sharey=True,
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    cm1 = plt.cm.autumn(np.linspace(0,0.95,N_bins))
-    cm2 = plt.cm.winter(np.linspace(0,1,N_bins))
-    cm3 = plt.cm.copper(np.linspace(0,1,N_bins))
-    lw = 0.8
-    for i in range(0, N_bins):
-        for j in range(3):
-            if i == 0:
-                label = labels[j] + "$<$"  + str(np.round(bins[j,1],2))
-            elif i == N_bins-1:
-                label = labels[j] + "$>$" + str(np.round(bins[j,i],2))
-            else:
-                label = str(np.round(bins[j,i],2)) \
-                    + "$<$" + labels[j] + "$<$" \
-                    + str(np.round(bins[j,i+1],2))
-            if j == 0:
-                cm = cm1
-            elif j==1:
-                cm = cm2
-            else:
-                cm = cm3
-            ax[j].semilogx(rad_mid, getattr(flm, bin_type[j] + "_log_" + quantity)[i,:], 
-                           color=cm[i], linewidth=lw,
-                           label=label)
-    # ax[0].set_ylim(ylim)
-    # ax[1].set_ylim(ylim)
-    # ax[2].set_ylim(ylim)
-    ax[0].legend()
-    ax[1].legend()
-    ax[2].legend()
-    ax[2].set_xlabel("$r/R_{\\rm{200m}}$")
-    ax[1].set_ylabel(r"$d \log \Sigma_{{\rm{{{}}}}} / d \log r$".format(quantity)) #need to change this label manually atm
-    # filename = "splashback_data/flamingo/plots/HF_compare_bins.png"
-    # plt.savefig(filename, dpi=300)
-    plt.show()
+    N_stack = bins.shape[0]
     
-    bin_type = np.array(["concentration", "symmetry", "alignment", "centroid"])
-    labels = np.array(["$c$", "$s$", "$a$", r"$\langle w \rangle$"])
-    N_bins = bins.shape[1] - 1
-    ylim = (-4,0.5)
-    fig, ax = plt.subplots(nrows=2, ncols=2, 
-                           figsize=(4,4), 
-                           sharey=True,
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    cm1 = plt.cm.autumn(np.linspace(0,0.95,N_bins))
-    cm2 = plt.cm.winter(np.linspace(0,1,N_bins))
-    cm3 = plt.cm.copper(np.linspace(0,1,N_bins))
-    lw = 0.8
-    for i in range(0, N_bins):
-        for j in range(4):
-            if i == 0:
-                label = labels[j] + "$<$"  + str(np.round(bins[j+3,1],2))
-            elif i == N_bins-1:
-                label = labels[j] + "$>$" + str(np.round(bins[j+3,i],2))
-            else:
-                label = str(np.round(bins[j+3,i],2)) \
-                    + "$<$" + labels[j] + "$<$" \
-                    + str(np.round(bins[j+3,i+1],2))
-            if j == 0:
-                cm = cm1
-                ax[0,j].semilogx(rad_mid, getattr(flm, bin_type[j] + "_log_" + quantity)[i,:], 
-                           color=cm[i], linewidth=lw,
-                           label=label)
-            elif j==1:
-                cm = cm2
-                ax[0,j].semilogx(rad_mid, getattr(flm, bin_type[j] + "_log_" + quantity)[i,:], 
-                           color=cm[i], linewidth=lw,
-                           label=label)
-            else:
-                cm = cm3
-                ax[1,j-2].semilogx(rad_mid, getattr(flm, bin_type[j] + "_log_" + quantity)[i,:], 
-                           color=cm[i], linewidth=lw,
-                           label=label)
-    # ax[0].set_ylim(ylim)
-    # ax[1].set_ylim(ylim)
-    # ax[2].set_ylim(ylim)
-    for a in ax.flat:
-        a.legend()
-    plt.xlabel("$r/R_{\\rm{200m}}$")
-    plt.ylabel(r"$d \log \Sigma_{{\rm{{{}}}}} / d \log r$".format(quantity)) #need to change this label manually atm
-    # filename = "splashback_data/flamingo/plots/HF_compare_bins.png"
-    # plt.savefig(filename, dpi=300)
-    plt.show()
-    
-    
-def check_proj_Rsp(data, mids, quantity):
-    fig, ax = plt.subplots(nrows=1, ncols=3, 
-                           sharey=True,
-                           figsize=(6,2.5),
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    cm = plt.cm.get_cmap('rainbow')
-    cacc = ax[0].scatter(data.R_DM_accretion, getattr(data, "R_" + quantity +"_accretion"),
-                         c=mids[0,:], 
-                         edgecolor="k", 
-                         cmap=cm, s=75)
-    cmass = ax[1].scatter(data.R_DM_mass, getattr(data, "R_" + quantity +"_mass"),
-                          c=mids[1,:], 
-                          edgecolor="k", 
-                          cmap=cm, s=75)
-    cener = ax[2].scatter(data.R_DM_energy, getattr(data, "R_" + quantity +"_energy"),
-                          c=mids[2,:], 
-                          edgecolor="k", 
-                          cmap=cm, s=75)
-    ax[1].set_xlabel("$R_{\\rm{SP,DM}}$")
-    ax[0].set_ylabel(r"$R_{{\rm{{SP,{}}}}}$".format(quantity))
-    cbaxes1 = fig.add_axes([0.09, 0.8, 0.015, 0.12]) 
-    cbar = fig.colorbar(cacc, cax=cbaxes1, label="$\Gamma$")
-    cbaxes2 = fig.add_axes([0.39, 0.8, 0.015, 0.12]) 
-    cbar = fig.colorbar(cmass, cax=cbaxes2, label="$\log M_{\\rm{200m}}$")
-    cbaxes3 = fig.add_axes([0.7, 0.8, 0.015, 0.12]) 
-    cbar = fig.colorbar(cener, cax=cbaxes3, label="$E_{\\rm{kin}}/E_{\\rm{therm}}$")
-    plt.show()
-    
-    fig, ax = plt.subplots(nrows=2, ncols=2, 
-                           sharey=True,
-                           figsize=(4,4),
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0})
-    cm = plt.cm.get_cmap('rainbow')
-    cc = ax[0,0].scatter(data.R_DM_concentration, getattr(data, "R_" 
-                                                         + quantity 
-                                                         + "_concentration"),
-                         c=mids[3,:], 
-                         edgecolor="k", 
-                         cmap=cm, s=75)
-    cs = ax[0,1].scatter(data.R_DM_symmetry, getattr(data, "R_" 
-                                                     + quantity 
-                                                     + "_symmetry"),
-                         c=mids[4,:], 
-                         edgecolor="k", 
-                         cmap=cm, s=75)
-    ca = ax[1,0].scatter(data.R_DM_alignment, getattr(data, "R_" 
-                                                      + quantity 
-                                                      +"_alignment"),
-                         c=mids[5,:], 
-                         edgecolor="k", 
-                         cmap=cm, s=75)
-    cw = ax[1,1].scatter(data.R_DM_centroid, getattr(data, "R_" 
-                                                     + quantity 
-                                                     +"_centroid"),
-                         c=mids[6,:], 
-                         edgecolor="k", 
-                         cmap=cm, s=75)
-    ax[1,0].set_xlabel("$R_{\\rm{SP,DM}}$")
-    ax[0,0].set_ylabel(r"$R_{{\rm{{SP,{}}}}}$".format(quantity))
-    cbaxes1 = fig.add_axes([0.15, 0.86, 0.015, 0.08]) 
-    cbar = fig.colorbar(cc, cax=cbaxes1, label="$c$")
-    cbaxes2 = fig.add_axes([0.57, 0.86, 0.015, 0.08]) 
-    cbar = fig.colorbar(cs, cax=cbaxes2, label="$s$")
-    cbaxes3 = fig.add_axes([0.15, 0.42, 0.015, 0.08]) 
-    cbar = fig.colorbar(ca, cax=cbaxes3, label="$a$")
-    cbaxes4 = fig.add_axes([0.57, 0.42, 0.015, 0.08]) 
-    cbar = fig.colorbar(cw, cax=cbaxes4, label=r"$\langle w \rangle$")
-    plt.show()
-    
-    
-def compare_morphology(data, mids):
-    fig, ax = plt.subplots(nrows=3, ncols=1,
-                           sharex=True,
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0},
-                           figsize=(3.3,6))
-    bin_type = np.array(["concentration", "symmetry", "alignment", "centroid"])
-    quantities = ["EM", "SZ", "WL"]
-    size=50
-    for i in range(3):
-       cc =  ax[i].scatter(getattr(data, "R_DM_concentration"), 
-                           getattr(data, "R_" + quantities[i] +"_concentration"),
-                           c=mids[0,:], cmap=plt.cm.get_cmap("autumn"),
-                           edgecolor="k",
-                           s=size,
-                           marker="o",
-                           label="$c$")
-       cs = ax[i].scatter(getattr(data, "R_DM_symmetry"), 
-                          getattr(data, "R_" + quantities[i] +"_symmetry"),
-                          c=mids[1,:], cmap=plt.cm.get_cmap("winter"),
-                          edgecolor="k",
-                          s=size,
-                          marker="*",
-                          label="$s$")
-       ca = ax[i].scatter(getattr(data, "R_DM_alignment"), 
-                          getattr(data, "R_" + quantities[i] +"_alignment"),
-                          c=mids[2,:], cmap=plt.cm.get_cmap("copper"),
-                          edgecolor="k",
-                          s=size,
-                          marker="^",
-                          label="$a$")
-       cw = ax[i].scatter(getattr(data, "R_DM_centroid"), 
-                          getattr(data, "R_" + quantities[i] +"_centroid"),
-                          c=mids[3,:], cmap=plt.cm.get_cmap("spring"),
-                          edgecolor="k",
-                          s=size,
-                          marker="P",
-                          label=r"$\log \langle w \rangle$")
-
-    cbaxes1 = fig.add_axes([0.67, 0.58, 0.02, 0.08]) 
-    fig.colorbar(cc, cax=cbaxes1, label="$c$")
-    cbaxes2 = fig.add_axes([0.82, 0.58, 0.02, 0.08]) 
-    fig.colorbar(cs, cax=cbaxes2, label="$s$")
-    cbaxes3 = fig.add_axes([0.185, 0.285, 0.02, 0.08]) 
-    fig.colorbar(ca, cax=cbaxes3, label="$a$")
-    cbaxes4 = fig.add_axes([0.335, 0.285, 0.02, 0.08]) 
-    fig.colorbar(cw, cax=cbaxes4, label=r"$\log \langle w \rangle$")
-
-    ax[0].legend()
-    ylim = ax[1].get_ylim()
-    ax[1].set_ylim((ylim[0], 1.57))
-    ax[0].set_ylabel("$R_{\\rm{SP,EM}} / R_{\\rm{200m}}$")
-    ax[1].set_ylabel("$R_{\\rm{SP,SZ}} / R_{\\rm{200m}}$")
-    ax[2].set_ylabel("$R_{\\rm{SP,WL}} / R_{\\rm{200m}}$")
-    ax[2].set_xlabel("$R_{\\rm{SP,DM}} / R_{\\rm{200m}}$")
-    # filename = "splashback_data/flamingo/plots/compare_Rsp_morph.png"
-    # plt.savefig(filename, dpi=300)
-    plt.show()
-    
-    
-def compare_best(data, mids):
-    fig, ax = plt.subplots(nrows=3, ncols=3,
+    fig, ax = plt.subplots(nrows=3, ncols=N_stack, 
                            sharex=True,
                            sharey='row',
                            gridspec_kw={'hspace' : 0, 'wspace' : 0},
-                           figsize=(5,4))
-    bin_type = np.array(["symmetry", "centroid", "gap"])
-    quantities = ["EM", "SZ", "WL"]
-    size=50
-    winter = plt.cm.get_cmap("winter")
-    spring = plt.cm.get_cmap("spring")
-    autumn = plt.cm.get_cmap("autumn")
-    for i in range(3):
-       cs = ax[i,0].scatter(getattr(data, "R_DM_symmetry"), 
-                          getattr(data, "R_" + quantities[i] +"_symmetry"),
-                          c=mids[1,:], cmap=winter,
-                          edgecolor="k",
-                          s=size,
-                          marker="*",
-                          label="$s$")
-
-       cw = ax[i,1].scatter(getattr(data, "R_DM_centroid"), 
-                          getattr(data, "R_" + quantities[i] +"_centroid"),
-                          c=mids[3,:], cmap=spring,
-                          edgecolor="k",
-                          s=size,
-                          marker="P",
-                          label=r"$\log \langle w \rangle$")
-       
-       cg = ax[i,2].scatter(getattr(data, "R_DM_gap"), 
-                          getattr(data, "R_" + quantities[i] +"_gap"),
-                          c=mids[3,:], cmap=autumn,
-                          edgecolor="k",
-                          s=size,
-                          marker="o",
-                          label=r"$M14$")
-
-    cbaxes1 = fig.add_axes([0.14, 0.78, 0.015, 0.08]) 
-    fig.colorbar(cs, cax=cbaxes1, label="$s$")
-    cbaxes2 = fig.add_axes([0.40, 0.78, 0.015, 0.08]) 
-    fig.colorbar(cw, cax=cbaxes2, label=r"$\log \langle w \rangle$")
-    cbaxes3 = fig.add_axes([0.67, 0.78, 0.015, 0.08]) 
-    fig.colorbar(cg, cax=cbaxes3, label=r"$M14$")
-
-    # ax[0,0].legend()
-    # ax[0,1].legend()
-    ylim = ax[1,0].get_ylim()
-    ax[1,0].set_ylim((ylim[0], 1.4))
-    ax[0,0].set_ylabel("$R_{\\rm{SP,EM}} / R_{\\rm{200m}}$")
-    ax[1,0].set_ylabel("$R_{\\rm{SP,SZ}} / R_{\\rm{200m}}$")
-    ax[2,0].set_ylabel("$R_{\\rm{SP,WL}} / R_{\\rm{200m}}$")
+                           figsize=(7.5,5))
     
-    plt.subplots_adjust(bottom=0.1)
-    plt.text(0.45, 0.01, "$R_{\\rm{SP,DM}} / R_{\\rm{200m}}$", 
-             transform=fig.transFigure)
-    
-    filename = "splashback_data/flamingo/plots/compare_Rsp_morph.png"
-    plt.savefig(filename, dpi=300)
-    plt.show()
-    
-    
-def plot_observables(data, bins):
-    fig, ax = plt.subplots(nrows=3, ncols=5, 
-                           sharex=True,
-                           sharey='row',
-                           gridspec_kw={'hspace' : 0, 'wspace' : 0},
-                           figsize=(8,5))
-    bin_type = np.array(["concentration", "symmetry", "alignment", "centroid", "gap"])
-    labels = np.array(["$c$", "$s$", "$a$", r"$ \log \langle w \rangle$", "$M14$"])
-    N_bins = bins.shape[1] - 1
-
     cmap_bins = np.linspace(0,0.95, N_bins)
     cmaps = ["autumn", "winter", "copper", "spring", "cool"]
     quantities = ["EM", "SZ", "WL"]
 
     lw = 0.8
-    for i in range(0, N_bins):
-        for j in range(5):
+    for i in range(N_bins):
+        for j in range(N_stack):
             cm = getattr(plt.cm, cmaps[j])(cmap_bins)
             for k in range(3):
                 if i == 0 and k == 0:
-                    label = labels[j] + "$<$"  + str(np.round(bins[j,1],2))
+                    label = axes_labels[bin_type[j]] + "$<$"  + str(np.round(bins[j,1],2))
                 elif i == N_bins-1 and k==0:
-                    label = labels[j] + "$>$" + str(np.round(bins[j,i],2))
+                    label = axes_labels[bin_type[j]] + "$>$" + str(np.round(bins[j,i],2))
                 elif k == 0:
                     label = str(np.round(bins[j,i],2)) \
-                        + "$<$" + labels[j] + "$<$" \
+                        + "$<$" + axes_labels[bin_type[j]] + "$<$" \
                         + str(np.round(bins[j,i+1],2))
                 else:
                     label=None
                 
-                ax[k,j].semilogx(rad_mid, getattr(flm, bin_type[j] + "_log_" + quantities[k])[i,:], 
+                ax[k,j].semilogx(flm.rad_mid, getattr(flm, bin_type[j] + "_log_" + quantities[k])[i,:], 
                                  color=cm[i], linewidth=lw,
                                  label=label)
 
-    for a in range(5):
+    for a in range(N_stack):
         ax[0,a].legend()
     # plt.xlabel("$r/R_{\\rm{200m}}$")
     ylim = ax[0,0].get_ylim()
@@ -396,12 +134,29 @@ def plot_observables(data, bins):
     ax[0,0].set_ylabel(r"$d \log \Sigma_{\rm{EM}} / d \log r$")
     ax[1,0].set_ylabel(r"$d \log \Sigma_{\rm{SZ}} / d \log r$")
     ax[2,0].set_ylabel(r"$d \log \Sigma_{\rm{WL}} / d \log r$")
-    filename = "splashback_data/flamingo/plots/profiles_2D_observables.png"
+    filename = "splashback_data/flamingo/plots/profiles_2D_theoretical.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
     
 def mass_cut(data, mass_range, quantities):
+    """
+    Applies a mass cut to listed quantities.
+
+    Parameters
+    ----------
+    data : obj
+        simulation data.
+    mass_range : float
+        Mass range values, cut out clusters with a mass outside this range.
+    quantities : list, str
+        Names of attributes in data to apply mass cut to.
+
+    Returns
+    -------
+    None.
+
+    """
     mass_range = 10**mass_range
     mass_cut = np.where((data.M200m >= mass_range[0]) & 
                         (data.M200m < mass_range[1]))[0]
@@ -412,50 +167,61 @@ def mass_cut(data, mass_range, quantities):
     
     
 def stack_for_profiles():
-    N_bins = 5
-    c_bins = np.append(np.linspace(0.0, 0.4, N_bins), 1)
-    s_bins = np.append(-1.5, np.append(np.linspace(0.05, 1.4, int(N_bins-1)), 2.2))
-    a_bins = np.append(-1., np.append(np.linspace(0.5, 1.5, N_bins-1), 5))
-    w_bins = np.append(-5, np.append(np.linspace(-2.7, -1, N_bins-1), 0))
-    gap_bins = np.append(np.linspace(0,2.5, N_bins), 8)
-    
-    mass_restriction = np.array([14.2, 14.4])
-    quantities_to_restrict = ["concentration", "symmetry", "alignment", "centroid",
-                              "EM_median", "SZ_median", "WL_median", "gap"]
-    mass_cut(flm, mass_restriction, quantities_to_restrict)
-    
-    bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
-    list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
-    bin_profiles(flm, bins, list_of_bins)
-    
-    plot_observables(flm, bins)
-    
-    
-def stack_for_Rsp():
-    N_bins = 10
-    c_bins = np.linspace(0.0, 0.4, N_bins+1)
-    s_bins = np.linspace(0.05, 1.4, N_bins+1)
-    a_bins = np.linspace(0.5, 1.5, N_bins+1)
-    w_bins = np.linspace(-2.7, -1, N_bins+1)
-    gap_bins = np.linspace(0,2.5, N_bins+1)
-    bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
-    list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
-    bin_profiles(flm, bins, list_of_bins)
-    
-    for i in range(len(list_of_bins)):
-        sp.stack_and_find_3D(flm, list_of_bins[i], bins[i,:])
+    """
+    Stacks and plots observable profiles.
 
-    c_mid = (c_bins[:-1] + c_bins[1:])/2
-    s_mid = (s_bins[:-1] + s_bins[1:])/2
-    a_mid = (a_bins[:-1] + a_bins[1:])/2
-    w_mid = (w_bins[:-1] + w_bins[1:])/2
-    gap_mid = (gap_bins[:-1] + gap_bins[1:])/2
-    mids = np.vstack((c_mid, s_mid, a_mid, w_mid, gap_mid))
+    Returns
+    -------
+    None.
+
+    """
+    N_bins = 5
+    mass_bins = np.linspace(14, 15, N_bins)
+    mass_bins = np.append(mass_bins, 16)
+    accretion_bins = np.linspace(0, 4, N_bins)
+    accretion_bins = np.append(accretion_bins, 20)
+    energy_bins = np.linspace(0.05, 0.3, N_bins)
+    energy_bins = np.append(energy_bins, 1)
+    # c_bins = np.append(np.linspace(0.0, 0.4, N_bins), 1)
+    # s_bins = np.append(-1.5, np.append(np.linspace(0.05, 1.4, int(N_bins-1)), 2.2))
+    # a_bins = np.append(-1., np.append(np.linspace(0.5, 1.5, N_bins-1), 5))
+    # w_bins = np.append(-5, np.append(np.linspace(-2.7, -1, N_bins-1), 0))
+    # gap_bins = np.append(np.linspace(0,2.5, N_bins), 8)
     
-    compare_best(flm, mids)
+    # mass_restriction = np.array([14.2, 14.4])
+    # quantities_to_restrict = ["concentration", "symmetry", "alignment", "centroid",
+    #                           "EM_median", "SZ_median", "WL_median", "gap",
+    #                           "M200m", "accretion", "energy"]
+    # mass_cut(flm, mass_restriction, quantities_to_restrict)
+    
+    # bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
+    # list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
+    bins = np.vstack((accretion_bins, mass_bins, energy_bins))
+    list_of_bins = ["accretion", "mass", "energy"]
+    bin_profiles(flm, bins, list_of_bins)
+    
+    plot_observables(flm, bins, list_of_bins)
     
     
 def plot_param_correlations(split, ax):
+    """
+    Plots parameter dependence for one property one one figure panel.
+    Calculates expected parameter dependence from projected 3D dark matter
+    density.
+
+    Parameters
+    ----------
+    split : str
+        Name of criteria used to stack profiles and the parameter plotted on
+        the x-axis.
+    ax : obj
+        Pyplot axis object, panel to plot data on.
+
+    Returns
+    -------
+    None.
+
+    """
     Rsp_EM = getattr(flm, "R_EM_"+split)
     Rsp_SZ = getattr(flm, "R_SZ_"+split)
     Rsp_WL = getattr(flm, "R_WL_"+split)
@@ -470,11 +236,18 @@ def plot_param_correlations(split, ax):
     axes_labels = {
         "mass": "$M_{\\rm{200m}}$",
         "accretion": "$\Gamma$",
-        "energy": "$E_{\\rm{kin}}/E_{\\rm{therm}}$",
+        "energy": "$X_{\\rm{E}}$",
         "symmetry": "$s$",
         "centroid": "$\log \langle w \\rangle$",
         "gap": "$M14$"}
-
+    params = ft.fit_log_models(flm, split)
+    projected_density = ft.project_model(flm.rad_mid, params)
+    projected_model_log_DM = sp.log_gradients(flm.rad_mid, projected_density,
+                                                  smooth=False)
+    # Projected splashback model from 3D
+    R_model = ft.find_sort_R(flm, flm.rad_mid, projected_model_log_DM, 
+                ["model", split])
+    # errors_model = ft.bootstrap_errors(flm, split)
     if split == "mass":
         ax.set_xscale('log')
     ax.errorbar(mids, Rsp_EM, yerr=errors_EM, 
@@ -483,166 +256,170 @@ def plot_param_correlations(split, ax):
                 color="c", label=label_SZ, capsize=2)
     ax.errorbar(mids, Rsp_WL, yerr=errors_WL, 
                 color="darkmagenta", label=label_WL, capsize=2)
+    # ax.errorbar(mids, R_model, yerr=errors_model,
+    #             color="k", label="Projected model", capsize=2)
+    # ax.plot(mids, Rsp_EM,
+    #         color="gold", label=label_EM,)
+    # ax.plot(mids, Rsp_SZ, 
+    #         color="c", label=label_SZ)
+    # ax.plot(mids, Rsp_WL, 
+    #         color="darkmagenta", label=label_WL)
+    ax.plot(mids, R_model, 
+            color="k", label="Projected model")
+    
     ax.set_xlabel(axes_labels[split])
 
     
 def stack_for_params():
+    """
+    Takes simulation data and plots Rsp and as a function of the criteria
+    used to stack the projected observable profiles.
+
+    Returns
+    -------
+    None.
+
+    """
     N_bins = 10
-    mass_bins = np.linspace(14, 15.6, N_bins+1)
-    accretion_bins = np.linspace(0, 4.2, N_bins+1)
-    energy_bins = np.linspace(0.05, 0.35, N_bins+1)
-    s_bins = np.linspace(0.05, 1.4, N_bins+1)
-    w_bins = np.linspace(-2.7, -1, N_bins+1)
-    gap_bins = np.linspace(0,2.5, N_bins+1)
+    flm.mass_bins = np.linspace(14, 15.2, N_bins+1)
+    flm.accretion_bins = np.linspace(0, 4.2, N_bins+1)
+    flm.energy_bins = np.linspace(0.05, 0.35, N_bins+1)
+    flm.symmetry_bins = np.linspace(0.05, 1.4, N_bins+1)
+    flm.centroid_bins = np.linspace(-2.7, -1, N_bins+1)
+    flm.gap_bins = np.linspace(0,2.5, N_bins+1)
     
-    bin_profiles(flm, np.vstack((accretion_bins, mass_bins, energy_bins,
-                                 s_bins, w_bins, gap_bins)), 
+    bin_profiles(flm, np.vstack((flm.accretion_bins, flm.mass_bins, flm.energy_bins,
+                                 flm.symmetry_bins, flm.centroid_bins, flm.gap_bins)), 
                  ["accretion", "mass", "energy","symmetry", "centroid", "gap"],
                  bootstrap=True)
+    
+    # test_bootstrap_iteration(flm, "M200m", flm.mass_bins)
     flm.R_WL_accretion, flm.second_WL_accretion = sp.second_caustic(flm.R_WL_accretion, 
                                                                     flm.second_WL_accretion)
     
-    flm.mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
-    flm.accretion_mid = (accretion_bins[:-1] + accretion_bins[1:])/2
-    flm.energy_mid = (energy_bins[:-1] + energy_bins[1:])/2
-    flm.symmetry_mid = (s_bins[:-1] + s_bins[1:])/2
-    flm.centroid_mid = (w_bins[:-1] + w_bins[1:])/2
-    flm.gap_mid = (gap_bins[:-1] + gap_bins[1:])/2
+    flm.mass_mid = 10**((flm.mass_bins[:-1] + flm.mass_bins[1:])/2)
+    flm.accretion_mid = (flm.accretion_bins[:-1] + flm.accretion_bins[1:])/2
+    flm.energy_mid = (flm.energy_bins[:-1] + flm.energy_bins[1:])/2
+    flm.symmetry_mid = (flm.symmetry_bins[:-1] + flm.symmetry_bins[1:])/2
+    flm.centroid_mid = (flm.centroid_bins[:-1] + flm.centroid_bins[1:])/2
+    flm.gap_mid = (flm.gap_bins[:-1] + flm.gap_bins[1:])/2
 
+    N_clusters = 15719
+    flm.symmetry = flm.symmetry[:N_clusters]
+    flm.centroid = flm.centroid[:N_clusters]
+    flm.gap = flm.gap[:N_clusters]
+    
     fig, axes = plt.subplots(nrows=1, ncols=3, 
-                             sharey=True,
-                             figsize=(7,2),
-                             gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+                              sharey=True,
+                              figsize=(7,2),
+                              gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
     plot_param_correlations("mass", axes[1])
     plot_param_correlations("accretion", axes[0])
     plot_param_correlations("energy", axes[2])
     axes[0].set_ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
     axes[0].legend()
-    # ylim = axes[0].get_ylim()
-    # ylim = (0, ylim[1])
-    # axes[0].set_ylim(ylim)
     plt.subplots_adjust(bottom=0.18)
     filename = "splashback_data/flamingo/plots/parameter_dependence_2D.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
     fig, axes = plt.subplots(nrows=1, ncols=3, 
-                             sharey=True,
-                             figsize=(7,2),
-                             gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+                              sharey=True,
+                              figsize=(7,2),
+                              gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
     plot_param_correlations("symmetry", axes[1])
-    plot_param_correlations("centroid", axes[0])
     plot_param_correlations("gap", axes[2])
+    plot_param_correlations("centroid", axes[0])
     axes[0].set_ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
     axes[0].legend()
-    # ylim = axes[0].get_ylim()
-    # ylim = (0, ylim[1])
-    # axes[0].set_ylim(ylim)
+    axes[0].set_ylim((0.6, 1.79))
     plt.subplots_adjust(bottom=0.18)
     filename = "splashback_data/flamingo/plots/obs_parameter_dependence_2D.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
     
-def bin_random(data, bins, split, N_clusters,
-               print_data=False):
-    if split == "mass":
-        split_name = "M200m"
-        split_data = np.log10(getattr(data, split_name))
-    else:
-        split_data = getattr(data, split)
-    N_profiles = 2
-        
-    
-    saving_strings = ["_P", "_SZ"]
-    pressure = data.gas_pressure_3D
-    SZ = data.SZ_median[:len(pressure)]
-    stacking_data = np.dstack((pressure, SZ))
-    
+def test_bootstrap_iteration(flm, split, split_bins):
+    """
+    Looks at samples within bootstrap resampling, uses previously identified 
+    most extreme sampling and investigates the differences between the highest
+    and lowest Rsp iterations.
+
+    Parameters
+    ----------
+    flm : onj
+        Simulation data.
+    split : str
+        Name of criteria used to stack profiles.
+    split_bins : float
+        Bin edges to use to split clusters and stack profiles within.
+
+    Returns
+    -------
+    None.
+
+    """
+    split_data = np.log10(getattr(flm, split))
     not_nan = np.where(np.isfinite(split_data)==True)[0]
-    #will return 0 or len for values outside the range
-    bins_sort = np.digitize(split_data[not_nan], bins)
-    N_bins = len(bins) - 1
-    stacked_data = np.zeros((N_bins, data.N_rad, N_profiles))
-    if print_data:
-        print("")
-        print(split)
-    for i in range(N_bins):
-        bin_mask = np.where(bins_sort == i+1)[0]
-        sample = np.random.choice(bin_mask, size=N_clusters, replace=False)
-        if print_data:
-            print(len(bin_mask))
-        for j in range(N_profiles):
-            stacked_data[i,:,j] = sp.stack_data(stacking_data[not_nan,:,j][sample,:])
-            
-    for i in range(N_profiles):
-        log = sp.log_gradients(data.rad_mid, stacked_data[:,:,i])
-        setattr(data, split+ "_profile" + saving_strings[i], stacked_data[:,:,i]) #previously density instead of profile
-        setattr(data, split+ "_log" + saving_strings[i], log)
-
-
-def stack_test():
-    N_bins = 4
-    mass_bins = np.linspace(14, 15.2, N_bins+1)
-    accretion_bins = np.linspace(0, 4, N_bins+1)
-    energy_bins = np.linspace(0.05, 0.35, N_bins+1)
+    bins_sort = np.digitize(split_data[not_nan], split_bins)
+    N_bins = len(split_bins) - 1
+    N_rad = len(flm.rad_mid)
     
-    mass_cut(flm, np.array([14.5,15]), ["accretion", "SZ_median", "gas_pressure_3D"])
+    stacked_data_SZ = np.zeros((4, N_rad))
+    log_sample_SZ = np.zeros((4, N_rad))
+    stacked_data_DM = np.zeros((4, N_rad))
+    log_sample_DM = np.zeros((4, N_rad))
     
-    bin_random(flm, accretion_bins, "accretion", 30, print_data=True) 
-                  
-    flm.mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
-    cm = plt.cm.autumn(np.linspace(0,0.95,N_bins))
-    plt.figure()
-    for i in range(N_bins):
-        plt.semilogx(flm.rad_mid, flm.accretion_log_P[i,:],
-                     color=cm[i])
+    iteration = np.array([[91, 8], [1, 69]])
+    bin_number = np.array([0, 9])
+    k = 0
+    for i in range(2): #vary bin choice
+        for j in range(2): #upper and lower iterations
+            bin_mask = np.where(bins_sort == bin_number[i]+1)[0]
+            np.random.seed(iteration[i,j]*15 + bin_number[i])
+            # Select random sample from bin with replacement
+            sample = np.random.choice(bin_mask, 
+                                      size=len(bin_mask),
+                                      replace=True)
+            stacked_data_SZ[k,:] = sp.stack_data(flm.SZ_median[not_nan[sample],:])
+            stacked_data_DM[k,:] = sp.stack_data(flm.DM_density_3D[not_nan[sample],:])
+            k += 1
+    log_sample_SZ = sp.log_gradients(flm.rad_mid, stacked_data_SZ)
+    log_sample_DM = sp.log_gradients(flm.rad_mid, stacked_data_DM)
+    
+    
+    fig, axes = plt.subplots(nrows=2, ncols=2,
+                              sharey="row",
+                              figsize=(4,2.5),
+                              gridspec_kw={'hspace' : 0, 'wspace' : 0})
+    axes[0,0].semilogx(flm.rad_mid, log_sample_DM[1,:], 
+                        color="purple", label="WL")
+    axes[0,1].semilogx(flm.rad_mid, log_sample_DM[0,:], 
+                        color="purple")
+    axes[0,0].semilogx(flm.rad_mid, log_sample_SZ[1,:],
+                        color="c", label="SZ")
+    axes[0,1].semilogx(flm.rad_mid, log_sample_SZ[0,:], 
+                        color="c")
+    
+    axes[1,0].semilogx(flm.rad_mid, log_sample_DM[3,:], 
+                        color="purple")
+    axes[1,1].semilogx(flm.rad_mid, log_sample_DM[2,:], 
+                        color="purple")
+    axes[1,0].semilogx(flm.rad_mid, log_sample_SZ[3,:], 
+                        color="c")
+    axes[1,1].semilogx(flm.rad_mid, log_sample_SZ[2,:], 
+                        color="c")
+    
+    axes[0,0].legend()
+    axes[0,0].text(0.05, 0.05, "Low $M_{\\rm{200m}}$", transform=axes[0,0].transAxes)
+    axes[1,0].text(0.05, 0.05, "High $M_{\\rm{200m}}$", transform=axes[1,0].transAxes)
+    axes[0,0].text(0.05, 0.90, "Low $R_{\\rm{SP}}$", transform=axes[0,0].transAxes)
+    axes[0,1].text(0.05, 0.90, "High $R_{\\rm{SP}}$", transform=axes[0,1].transAxes)
+    plt.text(0.5, 0.04, "$r/R_{\\rm{200m}}$", transform=fig.transFigure)
+    plt.text(0.0, 0.5, r"$d \log \Sigma / d \log r$", 
+              transform=fig.transFigure, rotation="vertical")
     plt.show()
-    plt.figure()
-    for i in range(N_bins):
-        plt.semilogx(flm.rad_mid, flm.accretion_log_SZ[i,:],
-                     color=cm[i])
-    plt.show()
-    
-    # plt.figure()
-    # plt.plot(flm.mass_mid, flm.R_P_mass, 
-    #               label="Pressure", color="b")
-    # plt.plot(flm.mass_mid, flm.R_SZ_mass, 
-    #               label="Compton-y", color="c")
-    # plt.plot(flm.mass_mid, flm.R_gas_mass, 
-    #               label="Gas density", color="r")
-    # plt.plot(flm.mass_mid, flm.R_EM_mass, 
-    #               label="emission measure", color="gold")
-    # plt.ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
-    # plt.legend()
-    # plt.xscale('log')
-    # # plt.subplots_adjust(bottom=0.18)
-    # # filename = "splashback_data/flamingo/plots/parameter_dependence_2D.png"
-    # # plt.savefig(filename, dpi=300)
-    # plt.show()
-    
-    # for index in range(10):
-    #     # gas_density = sp.log_gradients(flm.rad_mid, flm.gas_density_3D[index,:])
-    #     pressure = sp.log_gradients(flm.rad_mid, flm.gas_pressure_3D[index,:])
-    #     # EM = sp.log_gradients(flm.rad_mid, flm.EM_median[index,:])
-    #     SZ = sp.log_gradients(flm.rad_mid, flm.SZ_median[index,:])
-    #     plt.figure()
-    #     # plt.semilogx(flm.rad_mid, gas_density,
-    #     #          color="r", label="Gas density")
-    #     # plt.semilogx(flm.rad_mid, EM,
-    #     #          color="gold", label="Emission measure")
-    #     plt.semilogx(flm.rad_mid, pressure,
-    #              color="b", label="Pressure")
-    #     plt.semilogx(flm.rad_mid, SZ,
-    #              color="c", label="Compton-y")
-    #     plt.legend()
-    #     plt.ylim((-7,1))
-    #     plt.show()
 
-
-N_rad = 44
-log_radii = np.linspace(-1, 0.7, N_rad+1)
-rad_mid = (10**log_radii[1:] + 10**log_radii[:-1]) / 2
 
 if __name__ == "__main__":
     box = "L1000N1800"
@@ -655,8 +432,6 @@ if __name__ == "__main__":
     flm.read_magnitude_gap(twodim=True)
     convert_SZ_profiles()
     
-    # stack_for_profiles()
-    # stack_for_Rsp()
-    stack_for_params()
-    # stack_test()
+    stack_for_profiles()
+    # stack_for_params()
     
