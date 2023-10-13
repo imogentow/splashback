@@ -170,7 +170,7 @@ def project_model(radii, params):
     return projected_density
 
 
-def find_sort_R(flm, radii, array, names, plot="n"):
+def find_sort_R(flm, radii, array, names, plot=False):
     """
     Finds radii of minima locations in profile. Automatically sorts between
     second caustics and splashback features
