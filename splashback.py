@@ -276,16 +276,16 @@ def stack_and_find_3D(data, split, split_bins, bootstrap=False,
     R_SP_DM, second_DM, depth_DM, depth_second = dr.depth_cut(data.rad_mid, 
                                                               log_DM, 
                                                               cut=-2.5,
-                                                              depth_value="y",
-                                                              second_caustic="y")
-    R_SP_gas, depth_gas = dr.depth_cut(data.rad_mid, log_gas, cut=-2, depth_value="y")
+                                                              depth_value=True,
+                                                              second_caustic=True)
+    R_SP_gas, depth_gas = dr.depth_cut(data.rad_mid, log_gas, cut=-2, depth_value=True)
     if pressure:
         log_P = getattr(data, split+"_log_P")
         R_SP_P, second_P, depth_P, depth_second = dr.depth_cut(data.rad_mid, 
                                                               log_P, 
                                                               cut=-2.5,
-                                                              depth_value="y",
-                                                              second_caustic="y")
+                                                              depth_value=True,
+                                                              second_caustic=True)
         setattr(data, "R_P_"+split, R_SP_P)
         setattr(data, "2_P_"+split, second_P)
         setattr(data, "depth_P_"+split, depth_P)
@@ -295,8 +295,8 @@ def stack_and_find_3D(data, split, split_bins, bootstrap=False,
         R_SP_K, second_K, depth_K, depth_second = dr.depth_cut(data.rad_mid, 
                                                               log_K, 
                                                               cut=0.5,
-                                                              depth_value="y",
-                                                              second_caustic="y")
+                                                              depth_value=True,
+                                                              second_caustic=True)
         setattr(data, "R_K_"+split, R_SP_K)
         setattr(data, "2_K_"+split, second_K)
         setattr(data, "depth_K_"+split, depth_K)
@@ -361,8 +361,8 @@ def stack_and_find_2D(data, split, split_bins,
     R_SP_SZ, second_SZ, depth_SZ, _ = dr.depth_cut(data.rad_mid, 
                                                    log_SZ, 
                                                    cut=-2.5,
-                                                   depth_value="y",
-                                                   second_caustic="y")
+                                                   depth_value=True,
+                                                   second_caustic=True)
     setattr(data, "R_SZ_"+split, R_SP_SZ)
     setattr(data, "depth_SZ_"+split, depth_SZ)
     setattr(data, "second_SZ_"+split, second_SZ)
@@ -460,8 +460,8 @@ def bootstrap_errors(data, stacking_data, split, split_data, split_bins,
             Rsp_sample, second, gamma, _ = dr.depth_cut(data.rad_mid, 
                                                         log_sample, 
                                                         cut=-1,
-                                                        second_caustic="y",
-                                                        depth_value="y")
+                                                        second_caustic=True,
+                                                        depth_value=True)
             if split == "accretion":
                 Rsp_sample, _ = second_caustic(Rsp_sample, second)
             Rsp_error[k,i] = np.nanstd(Rsp_sample)
