@@ -34,7 +34,7 @@ list_good2 = np.intersect1d(
 list_good = np.intersect1d(list_good1, list_good2)
 
 plot_data = properties_all[:,list_good].T
-labels = [r'$\log M_{\rm{200m}}$', r'$\Gamma$', r'$X_{\rm{E}}$',
+labels = [r'$\log \left( M_{\rm{200m}}/M_{\odot}\right)$', r'$\Gamma$', r'$X_{\rm{E}}$',
             '$M14$', '$c$', '$s$', '$a$', '$\log \langle w \\rangle$']
 N_properties = len(labels)
 
