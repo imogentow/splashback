@@ -130,11 +130,11 @@ def plot_observables(data, bins, bin_type):
     # plt.xlabel("$r/R_{\\rm{200m}}$")
     ylim = ax[0,0].get_ylim()
     ax[0,0].set_ylim((ylim[0],3))
-    plt.text(0.5, 0.05, "$r/R_{\\rm{200m}}$", transform=fig.transFigure)
+    plt.text(0.5, 0.05, "$R/R_{\\rm{200m}}$", transform=fig.transFigure)
     ax[0,0].set_ylabel(r"$d \log \Sigma_{\rm{EM}} / d \log r$")
-    ax[1,0].set_ylabel(r"$d \log \Sigma_{\rm{SZ}} / d \log r$")
+    ax[1,0].set_ylabel(r"$d \log \Sigma_{\rm{y}} / d \log r$")
     ax[2,0].set_ylabel(r"$d \log \Sigma_{\rm{WL}} / d \log r$")
-    filename = "splashback_data/flamingo/plots/profiles_2D_theoretical.png"
+    filename = "splashback_data/flamingo/plots/profiles_2D_observables.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
@@ -176,28 +176,28 @@ def stack_for_profiles():
 
     """
     N_bins = 5
-    mass_bins = np.linspace(14, 15, N_bins)
-    mass_bins = np.append(mass_bins, 16)
-    accretion_bins = np.linspace(0, 4, N_bins)
-    accretion_bins = np.append(accretion_bins, 20)
-    energy_bins = np.linspace(0.05, 0.3, N_bins)
-    energy_bins = np.append(energy_bins, 1)
-    # c_bins = np.append(np.linspace(0.0, 0.4, N_bins), 1)
-    # s_bins = np.append(-1.5, np.append(np.linspace(0.05, 1.4, int(N_bins-1)), 2.2))
-    # a_bins = np.append(-1., np.append(np.linspace(0.5, 1.5, N_bins-1), 5))
-    # w_bins = np.append(-5, np.append(np.linspace(-2.7, -1, N_bins-1), 0))
-    # gap_bins = np.append(np.linspace(0,2.5, N_bins), 8)
+    # mass_bins = np.linspace(14, 15, N_bins)
+    # mass_bins = np.append(mass_bins, 16)
+    # accretion_bins = np.linspace(0, 4, N_bins)
+    # accretion_bins = np.append(accretion_bins, 20)
+    # energy_bins = np.linspace(0.05, 0.3, N_bins)
+    # energy_bins = np.append(energy_bins, 1)
+    c_bins = np.append(np.linspace(0.0, 0.4, N_bins), 1)
+    s_bins = np.append(-1.5, np.append(np.linspace(0.05, 1.4, int(N_bins-1)), 2.2))
+    a_bins = np.append(-1., np.append(np.linspace(0.5, 1.5, N_bins-1), 5))
+    w_bins = np.append(-5, np.append(np.linspace(-2.7, -1, N_bins-1), 0))
+    gap_bins = np.append(np.linspace(0,2.5, N_bins), 8)
     
-    # mass_restriction = np.array([14.2, 14.4])
-    # quantities_to_restrict = ["concentration", "symmetry", "alignment", "centroid",
-    #                           "EM_median", "SZ_median", "WL_median", "gap",
-    #                           "M200m", "accretion", "energy"]
-    # mass_cut(flm, mass_restriction, quantities_to_restrict)
+    mass_restriction = np.array([14.2, 14.4])
+    quantities_to_restrict = ["concentration", "symmetry", "alignment", "centroid",
+                              "EM_median", "SZ_median", "WL_median", "gap",
+                              "M200m", "accretion", "energy"]
+    mass_cut(flm, mass_restriction, quantities_to_restrict)
     
-    # bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
-    # list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
-    bins = np.vstack((accretion_bins, mass_bins, energy_bins))
-    list_of_bins = ["accretion", "mass", "energy"]
+    bins = np.vstack((c_bins, s_bins, a_bins, w_bins, gap_bins))
+    list_of_bins = ["concentration", "symmetry", "alignment", "centroid", "gap"]
+    # bins = np.vstack((accretion_bins, mass_bins, energy_bins))
+    # list_of_bins = ["accretion", "mass", "energy"]
     bin_profiles(flm, bins, list_of_bins)
     
     plot_observables(flm, bins, list_of_bins)
@@ -234,7 +234,7 @@ def plot_param_correlations(split, ax):
     label_WL = "Surface density"
     
     axes_labels = {
-        "mass": "$M_{\\rm{200m}}$",
+        "mass": "$M_{\\rm{200m}} / M_{\odot}$",
         "accretion": "$\Gamma$",
         "energy": "$X_{\\rm{E}}$",
         "symmetry": "$s$",
@@ -264,8 +264,8 @@ def plot_param_correlations(split, ax):
     #         color="c", label=label_SZ)
     # ax.plot(mids, Rsp_WL, 
     #         color="darkmagenta", label=label_WL)
-    ax.plot(mids, R_model, 
-            color="k", label="Projected model")
+    # ax.plot(mids, R_model, 
+    #         color="k", label="Projected model")
     
     ax.set_xlabel(axes_labels[split])
 
@@ -316,10 +316,10 @@ def stack_for_params():
     plot_param_correlations("mass", axes[1])
     plot_param_correlations("accretion", axes[0])
     plot_param_correlations("energy", axes[2])
-    axes[0].set_ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
+    axes[0].set_ylabel("$R_{\\rm{min}} / R_{\\rm{200m}}$")
     axes[0].legend()
     plt.subplots_adjust(bottom=0.18)
-    filename = "splashback_data/flamingo/plots/parameter_dependence_2D.png"
+    filename = "splashback_data/flamingo/plots/parameter_dependence_2D_new.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
@@ -330,11 +330,11 @@ def stack_for_params():
     plot_param_correlations("symmetry", axes[1])
     plot_param_correlations("gap", axes[2])
     plot_param_correlations("centroid", axes[0])
-    axes[0].set_ylabel("$R_{\\rm{minima}} / R_{\\rm{200m}}$")
+    axes[0].set_ylabel("$R_{\\rm{min}} / R_{\\rm{200m}}$")
     axes[0].legend()
     axes[0].set_ylim((0.6, 1.79))
     plt.subplots_adjust(bottom=0.18)
-    filename = "splashback_data/flamingo/plots/obs_parameter_dependence_2D.png"
+    filename = "splashback_data/flamingo/plots/obs_parameter_dependence_2D_new.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
@@ -432,6 +432,6 @@ if __name__ == "__main__":
     flm.read_magnitude_gap(twodim=True)
     convert_SZ_profiles()
     
-    stack_for_profiles()
-    # stack_for_params()
+    # stack_for_profiles()
+    stack_for_params()
     
