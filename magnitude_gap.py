@@ -60,7 +60,7 @@ plt.errorbar(gap_mids, flm_high.R_DM_gap, yerr=flm_high.error_R_DM_gap,
              capsize=2, label="L1_m8")
 plt.legend()
 plt.xlabel("$M14$")
-plt.ylabel("$R_{\\rm{SP}}$")
+plt.ylabel("$R_{\\rm{SP}}/R_{\\rm{200m}}$")
 filename = "splashback_data/flamingo/plots/gap_res_compare_R.png"
 plt.savefig(filename, dpi=300)
 plt.show()
