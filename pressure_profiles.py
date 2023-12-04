@@ -33,7 +33,7 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
     ylim_P = (-4.5,1.4)
     ylim_K = (-0.6,1.4)
     fig, ax = plt.subplots(nrows=3, ncols=2, 
-                           figsize=(4,5), 
+                           figsize=(3.3,4.5), 
                            sharey="col",
                            gridspec_kw={'hspace' : 0, 'wspace' : 0.2})
     cm1 = plt.cm.autumn(np.linspace(0,0.95,N_bins))
@@ -73,9 +73,10 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
     ax[1,0].set_xticklabels([])
     ax[0,1].set_xticklabels([])
     ax[1,1].set_xticklabels([])
-    fig.text(0.48, 0.05, "$r/R_{\\rm{200m}}$", transform=fig.transFigure)
+    fig.text(0.48, 0.02, "$r/R_{\\rm{200m}}$", transform=fig.transFigure)
     ax[0,0].text(0.05, 0.07, "$f=P$", transform=ax[0,0].transAxes)
     ax[0,1].text(0.05, 0.07, "$f=K$", transform=ax[0,1].transAxes)
+    plt.subplots_adjust(bottom=0.07, top=0.99, right=0.99)
     filename = "splashback_data/flamingo/plots/HF_compare_bins_pressure_entropy.png"
     plt.savefig(filename, dpi=300)
     plt.show()
