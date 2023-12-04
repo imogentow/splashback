@@ -230,11 +230,12 @@ def plot_difference(flm, dmo):
     
     fig, ax = plt.subplots(nrows=1, ncols=2, sharey=True,
                            gridspec_kw={'hspace' : 0, 'wspace' : 0},
-                           figsize=(4,2.5))
+                           figsize=(3.3,2))
     ax[0].errorbar(mass_mid, delta_mass, yerr=mass_error,
                    fmt="o",
                    color="cyan",
-                   capsize=2)
+                   capsize=2,
+                   markersize=2)
     ax[0].set_xscale('log')
     xlim = ax[0].get_xlim()
     ax[0].semilogx(xlim, (mean_mass, mean_mass),
@@ -243,14 +244,15 @@ def plot_difference(flm, dmo):
     ax[0].semilogx(xlim, (0,0),
                     color="k", label="Zero")
     ax[0].set_xlim(xlim)
-    ax[0].set_xlabel("$M_{\\rm{200m}} / M_{\odot}$")
+    ax[0].set_xlabel("$M_{\\rm{200m}} / \\rm{M_{\odot}}$")
     ax[0].set_ylabel("$(R_{\\rm{SP,hydro}} - R_{\\rm{SP, DMO}}) / R_{\\rm{SP,hydro}}$")
     ax[0].legend()
     
-    ax[1].plot(accretion_mid, delta_accretion, yerr=acc_error,
+    ax[1].errorbar(accretion_mid, delta_accretion, yerr=acc_error,
                    fmt="o",
                    color="r",
-                   capsize=2)
+                   capsize=2,
+                   markersize=2)
     xlim = ax[1].get_xlim()
     ax[1].plot(xlim, (mean_acc, mean_acc), 
                 linestyle="--", color="grey")
@@ -258,6 +260,7 @@ def plot_difference(flm, dmo):
                     color="k")
     ax[1].set_xlim(xlim)
     ax[1].set_xlabel("$\Gamma$")
+    plt.subplots_adjust(left=0.15, right=0.99, bottom=0.17,top=0.99)
     filename = "splashback_data/flamingo/plots/dmo_differences.png"
     plt.savefig(filename, dpi=300)
     plt.show()
@@ -274,10 +277,10 @@ mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
 accretion_mid = (accretion_bins[:-1] + accretion_bins[1:])/2
 bins = np.vstack((accretion_bins, mass_bins))
 
-sp.stack_and_find_3D(flm, "accretion", accretion_bins, bootstrap=False)
-sp.stack_and_find_3D(flm, "mass", mass_bins, bootstrap=False)
-dmo_stacking(dmo, "accretion", accretion_bins, bootstrap=False)
-dmo_stacking(dmo, "mass", mass_bins, bootstrap=False)
+sp.stack_and_find_3D(flm, "accretion", accretion_bins, bootstrap=True)
+sp.stack_and_find_3D(flm, "mass", mass_bins, bootstrap=True)
+dmo_stacking(dmo, "accretion", accretion_bins, bootstrap=True)
+dmo_stacking(dmo, "mass", mass_bins, bootstrap=True)
 second_caustic(dmo, "accretion")
 second_caustic(flm, "accretion")
 
