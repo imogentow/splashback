@@ -6,12 +6,13 @@ from scipy.optimize import curve_fit
 plt.style.use("mnras.mplstyle")
 
 axes_labels = {
-    "mass": "$M_{\\rm{200m}}$",
+    "mass": "$M_{\\rm{200m}} / \\rm{M_{\odot}}$",
     "accretion": "$\Gamma$",
     "energy": "$X_{\\rm{E}}$"}
 
 
-def bin_profiles(data, accretion_bins, mass_bins, energy_bins):
+def bin_profiles(data, accretion_bins, mass_bins, energy_bins,
+                 bootstrap=False):
     """
     Takes a given run object and bins the density profiles according to
     3 given bin arrays. 
@@ -32,9 +33,9 @@ def bin_profiles(data, accretion_bins, mass_bins, energy_bins):
     None.
     """
 
-    sp.stack_and_find_3D(data, "accretion", accretion_bins, bootstrap=True)
-    sp.stack_and_find_3D(data, "mass", mass_bins, bootstrap=True)
-    sp.stack_and_find_3D(data, "energy", energy_bins, bootstrap=True)
+    sp.stack_and_find_3D(data, "accretion", accretion_bins, bootstrap=bootstrap)
+    sp.stack_and_find_3D(data, "mass", mass_bins, bootstrap=bootstrap)
+    sp.stack_and_find_3D(data, "energy", energy_bins, bootstrap=bootstrap)
     
     
 def second_caustic(split):
@@ -92,9 +93,9 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
     bin_type = np.array(["accretion", "mass", "energy"])
     labels = np.array(["$\Gamma$", "$\log M_{\\rm{200m}}$", "$X_{\\rm{E}}$"])
     N_bins = len(accretion_bins) - 1
-    ylim = (-4.1,0.5)
+    ylim = (-4.1,1.5)
     fig, ax = plt.subplots(nrows=3, ncols=2, 
-                           figsize=(4,5), 
+                           figsize=(3.3,4.5), 
                            sharey=True,
                            gridspec_kw={'hspace' : 0, 'wspace' : 0})
     cm1 = plt.cm.autumn(np.linspace(0,0.95,N_bins))
@@ -117,16 +118,25 @@ def plot_profiles_3D_all(flm, accretion_bins, mass_bins, energy_bins):
                 cm = cm2
             else:
                 cm = cm3
+            if i <= 2:
+                label_DM = label
+                label_gas = ""
+            else:
+                label_DM = ""
+                label_gas = label
             ax[j,0].semilogx(flm.rad_mid, getattr(flm, bin_type[j] + "_log_DM")[i,:], 
                            color=cm[i], linewidth=lw,
-                           label=label)
+                           label=label_DM)
             ax[j,1].semilogx(flm.rad_mid, getattr(flm, bin_type[j] + "_log_gas")[i,:], 
                            color=cm[i], linewidth=lw,
-                           label=label)
+                           label=label_gas)
     ax[0,0].set_ylim(ylim)
-    ax[0,0].legend()
-    ax[1,0].legend()
-    ax[2,0].legend()
+    ax[0,0].legend(loc="upper right")
+    ax[1,0].legend(loc="upper right")
+    ax[2,0].legend(loc="upper right")
+    ax[0,1].legend(loc="upper left")
+    ax[1,1].legend(loc="upper left")
+    ax[2,1].legend(loc="upper left")
     ax[1,0].set_ylabel(r"$d \log \rho / d \log r$")
     plt.subplots_adjust(bottom=0.1)
     ax[0,0].set_xticklabels([])
@@ -233,6 +243,9 @@ def plot_param_correlations(split, ax, plot="R"):
     label_DM = "Dark matter density"
     label_gas = "Gas density"
     label_P = "Gas pressure"
+    
+    fmt = ""
+    
     # plt.figure()
     if split == "mass":
         ax.set_xscale('log')
@@ -244,10 +257,13 @@ def plot_param_correlations(split, ax, plot="R"):
                   color="darkmagenta", label="More 2015", linestyle="--")
         ax.plot(mids, Rsp_oneil, 
                   color="darkmagenta", label="O'Neil 2021", linestyle=":")
-        label_DM = "Data"
+        ax.plot(mids, Rsp_mine,
+                color="darkmagenta", label="Our model",)
+        label_DM = "Our data"
         label_gas = ""
         label_P = ""
-    ax.errorbar(mids, plot_DM, yerr=3*errors_DM, 
+        fmt = "."
+    ax.errorbar(mids, plot_DM, yerr=3*errors_DM, fmt=fmt, 
                 color="darkmagenta", label=label_DM, capsize=2)
     ax.errorbar(mids, plot_gas, yerr=3*errors_gas, 
                 color="gold", label=label_gas, capsize=2)
@@ -298,7 +314,8 @@ def stack_for_params():
     accretion_bins = np.linspace(0, 4.2, N_bins+1)
     energy_bins = np.linspace(0.05, 0.35, N_bins+1)
     
-    bin_profiles(flm, accretion_bins, mass_bins, energy_bins)
+    bin_profiles(flm, accretion_bins, mass_bins, energy_bins,
+                 bootstrap=True)
     second_caustic("accretion")
     
     flm.mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
