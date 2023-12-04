@@ -5,12 +5,12 @@ import splashback as sp
 plt.style.use("mnras.mplstyle")
 
 axes_labels = {
-    "mass": "$M_{\\rm{200m}}$",
+    "mass": "$M_{\\rm{200m}} / \\rm{M_{\odot}}$",
     "accretion": "$\Gamma$",
     "energy": "$X_{\\rm{E}}$"}
         
 
-def bin_profiles(data, accretion_bins, mass_bins, energy_bins, bootstrap="none"):
+def bin_profiles(data, accretion_bins, mass_bins, energy_bins, bootstrap=False):
     """
     Takes a given run object and bins the density profiles according to
     given bin arrays. 
@@ -144,7 +144,7 @@ def stack_for_params(list_of_sims):
 
     """
     N_bins = 10
-    mass_bins = np.linspace(14, 14.1, N_bins+1)
+    mass_bins = np.linspace(14, 15.2, N_bins+1)
     accretion_bins = np.linspace(0, 4.2, N_bins+1)
     energy_bins = np.linspace(0.05, 0.35, N_bins+1)
     mass_mid = 10**((mass_bins[:-1] + mass_bins[1:])/2)
@@ -190,8 +190,8 @@ def stack_for_params(list_of_sims):
     axes[1,1].legend(ncol=2)
     axes[0,0].set_ylim((0.75, 1.2))
     axes[1,0].set_ylim((0.75, 1.2))
-    # filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_Rsp.png"
-    # plt.savefig(filename, dpi=300)
+    filename = "splashback_data/flamingo/plots/parameter_dependence_cosmo_Rsp.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
     
     fig, axes = plt.subplots(nrows=2, ncols=3, 
@@ -222,8 +222,8 @@ def stack_for_params(list_of_sims):
     axes[1,1].legend(ncol=2)
     axes[0,0].set_ylim((0.75, 1.2))
     axes[1,0].set_ylim((0.75, 1.2))
-    # filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_gamma.png"
-    # plt.savefig(filename, dpi=300)
+    filename = "splashback_data/flamingo/plots/parameter_dependence_cosmo_gamma.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
     
 
@@ -260,5 +260,5 @@ if __name__ == "__main__":
     hpv = sp.flamingo(box, "HPV")
     hpv.read_properties()
 
-    stack_for_params([hf, hwa, hsa, hta, hua, hj, hsj])
-    # stack_for_params([hf, hp, hpf, hpv])
+    # stack_for_params([hf, hwa, hsa, hta, hua, hj, hsj])
+    stack_for_params([hf, hp, hpf, hpv])
