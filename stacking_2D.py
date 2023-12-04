@@ -11,7 +11,7 @@ unit_converter = 1.99e30 / (3.09e22**3)
 rho_crit = rho_crit / unit_converter
 
 axes_labels = {
-    "mass": "$M_{\\rm{200m}}$",
+    "mass": "$M_{\\rm{200m}} / \\rm{M_{\odot}}$",
     "accretion": "$\Gamma$",
     "energy": "$X_{\\rm{E}}$",
     "concentration": "$c$",
@@ -233,13 +233,6 @@ def plot_param_correlations(split, ax):
     label_SZ = "Compton-y"
     label_WL = "Surface density"
     
-    axes_labels = {
-        "mass": "$M_{\\rm{200m}} / M_{\odot}$",
-        "accretion": "$\Gamma$",
-        "energy": "$X_{\\rm{E}}$",
-        "symmetry": "$s$",
-        "centroid": "$\log \langle w \\rangle$",
-        "gap": "$M14$"}
     params = ft.fit_log_models(flm, split)
     projected_density = ft.project_model(flm.rad_mid, params)
     projected_model_log_DM = sp.log_gradients(flm.rad_mid, projected_density,
@@ -247,7 +240,7 @@ def plot_param_correlations(split, ax):
     # Projected splashback model from 3D
     R_model = ft.find_sort_R(flm, flm.rad_mid, projected_model_log_DM, 
                 ["model", split])
-    # errors_model = ft.bootstrap_errors(flm, split)
+    errors_model = ft.bootstrap_errors(flm, split)
     if split == "mass":
         ax.set_xscale('log')
     ax.errorbar(mids, Rsp_EM, yerr=errors_EM, 
@@ -256,8 +249,8 @@ def plot_param_correlations(split, ax):
                 color="c", label=label_SZ, capsize=2)
     ax.errorbar(mids, Rsp_WL, yerr=errors_WL, 
                 color="darkmagenta", label=label_WL, capsize=2)
-    # ax.errorbar(mids, R_model, yerr=errors_model,
-    #             color="k", label="Projected model", capsize=2)
+    ax.errorbar(mids, R_model, yerr=errors_model,
+                color="k", label="Projected model", capsize=2)
     # ax.plot(mids, Rsp_EM,
     #         color="gold", label=label_EM,)
     # ax.plot(mids, Rsp_SZ, 
@@ -288,9 +281,9 @@ def stack_for_params():
     flm.centroid_bins = np.linspace(-2.7, -1, N_bins+1)
     flm.gap_bins = np.linspace(0,2.5, N_bins+1)
     
-    bin_profiles(flm, np.vstack((flm.accretion_bins, flm.mass_bins, flm.energy_bins,
-                                 flm.symmetry_bins, flm.centroid_bins, flm.gap_bins)), 
-                 ["accretion", "mass", "energy","symmetry", "centroid", "gap"],
+    bin_profiles(flm, np.vstack((flm.accretion_bins, flm.mass_bins, flm.energy_bins)),
+                                 # flm.symmetry_bins, flm.centroid_bins, flm.gap_bins)), 
+                 ["accretion", "mass", "energy"],#"symmetry", "centroid", "gap"],
                  bootstrap=True)
     
     # test_bootstrap_iteration(flm, "M200m", flm.mass_bins)
@@ -323,20 +316,20 @@ def stack_for_params():
     plt.savefig(filename, dpi=300)
     plt.show()
     
-    fig, axes = plt.subplots(nrows=1, ncols=3, 
-                              sharey=True,
-                              figsize=(7,2),
-                              gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
-    plot_param_correlations("symmetry", axes[1])
-    plot_param_correlations("gap", axes[2])
-    plot_param_correlations("centroid", axes[0])
-    axes[0].set_ylabel("$R_{\\rm{min}} / R_{\\rm{200m}}$")
-    axes[0].legend()
-    axes[0].set_ylim((0.6, 1.79))
-    plt.subplots_adjust(bottom=0.18)
-    filename = "splashback_data/flamingo/plots/obs_parameter_dependence_2D_new.png"
-    plt.savefig(filename, dpi=300)
-    plt.show()
+    # fig, axes = plt.subplots(nrows=1, ncols=3, 
+    #                           sharey=True,
+    #                           figsize=(7,2),
+    #                           gridspec_kw={'hspace' : 0.1, 'wspace' : 0})
+    # plot_param_correlations("symmetry", axes[1])
+    # plot_param_correlations("gap", axes[2])
+    # plot_param_correlations("centroid", axes[0])
+    # axes[0].set_ylabel("$R_{\\rm{min}} / R_{\\rm{200m}}$")
+    # axes[0].legend()
+    # axes[0].set_ylim((0.6, 1.79))
+    # plt.subplots_adjust(bottom=0.18)
+    # filename = "splashback_data/flamingo/plots/obs_parameter_dependence_2D_new.png"
+    # # plt.savefig(filename, dpi=300)
+    # plt.show()
     
     
 def test_bootstrap_iteration(flm, split, split_bins):
