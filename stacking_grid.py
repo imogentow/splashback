@@ -115,7 +115,7 @@ def grid_plot_both(data, quantity1, quantity2):
     N_1 = len(bins1) - 1
     N_2 = len(bins2) - 1
     fig, ax = plt.subplots(nrows=N_2, ncols=2,
-                           figsize=(4,6),
+                           figsize=(3.3,6.6),
                            sharex=True, sharey=True,
                            gridspec_kw={'hspace' : 0, 'wspace' : 0})
     cm = plt.cm.copper(np.linspace(0,1,N_1))
@@ -132,20 +132,20 @@ def grid_plot_both(data, quantity1, quantity2):
                              color=cm[j], linewidth=0.8,
                              label=label)
         plot_label = str(np.round(bins2[i],2)) \
-                        + r"$< X_{\rm{E}} <$" \
+                        + r"$< \Gamma <$" \
                         + str(np.round(bins2[i+1],2))
         ax[i,0].text(0.05, 0.05, plot_label, transform=ax[i,0].transAxes)
     ax[0,0].text(0.85, 0.06, "$\\rho_{\\rm{DM}}$", transform=ax[0,0].transAxes)
     ax[0,1].text(0.85, 0.06, "$\\rho_{\\rm{gas}}$", transform=ax[0,1].transAxes)
-    fig.text(0.02, 0.45, r"$d \log \rho / d \log r$",
+    fig.text(0.0, 0.45, r"$d \log \rho / d \log r$",
              transform=fig.transFigure, rotation='vertical')
-    fig.text(0.45, 0.02, "$r/R_{\\rm{200m}}$",
+    fig.text(0.45, 0.01, "$r/R_{\\rm{200m}}$",
              transform=fig.transFigure,)
     ax[0,0].legend()
-    ax[0,0].set_ylim((-4.5, 0.5))
-    plt.subplots_adjust(left=0.11, bottom=0.08)
-    # filename = "splashback_data/flamingo/plots/grid_stacking_gas_DM.png"
-    # plt.savefig(filename, dpi=300)
+    ax[0,0].set_ylim((-4.1, 0.99))
+    plt.subplots_adjust(left=0.1, bottom=0.05, right=0.95)
+    filename = "splashback_data/flamingo/plots/grid_stacking_gas_DM.png"
+    plt.savefig(filename, dpi=300)
     plt.show()
     
 
@@ -155,8 +155,8 @@ def stack_for_profiles(data):
     data.accretion_bins = np.linspace(0, 4, N_bins)
     data.energy_bins = np.linspace(0, 0.4, N_bins)
  
-    stack_grid_bins(data, "mass", "energy")
-    grid_plot_both(data, "mass", "energy")
+    stack_grid_bins(data, "mass", "accretion")
+    grid_plot_both(data, "mass", "accretion")
     
 
 if __name__ == "__main__":
