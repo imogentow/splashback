@@ -190,7 +190,7 @@ def stack_for_params(list_of_sims):
     axes[1,1].legend(ncol=2)
     axes[0,0].set_ylim((0.75, 1.2))
     axes[1,0].set_ylim((0.75, 1.2))
-    filename = "splashback_data/flamingo/plots/parameter_dependence_cosmo_Rsp.png"
+    filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_Rsp.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
@@ -222,7 +222,7 @@ def stack_for_params(list_of_sims):
     axes[1,1].legend(ncol=2)
     axes[0,0].set_ylim((0.75, 1.2))
     axes[1,0].set_ylim((0.75, 1.2))
-    filename = "splashback_data/flamingo/plots/parameter_dependence_cosmo_gamma.png"
+    filename = "splashback_data/flamingo/plots/parameter_dependence_all_runs_gamma.png"
     plt.savefig(filename, dpi=300)
     plt.show()
     
@@ -251,14 +251,14 @@ if __name__ == "__main__":
     hsj = sp.flamingo(box, "HSJ")
     hsj.read_properties()
     
-    hp = sp.flamingo(box, "HP")
-    hp.read_properties()
+    # hp = sp.flamingo(box, "HP")
+    # hp.read_properties()
     
-    hpf = sp.flamingo(box, "HPF")
-    hpf.read_properties()
+    # hpf = sp.flamingo(box, "HPF")
+    # hpf.read_properties()
     
-    hpv = sp.flamingo(box, "HPV")
-    hpv.read_properties()
+    # hpv = sp.flamingo(box, "HPV")
+    # hpv.read_properties()
 
-    # stack_for_params([hf, hwa, hsa, hta, hua, hj, hsj])
-    stack_for_params([hf, hp, hpf, hpv])
+    stack_for_params([hf, hwa, hsa, hta, hua, hj, hsj])
+    # stack_for_params([hf, hp, hpf, hpv])
