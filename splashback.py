@@ -43,10 +43,15 @@ class flamingo:
         self.run_label = identifiers[self.run]
         self.path = PATH + "flamingo/" + box + "_" + run
         
-        self.DM_density_3D = np.genfromtxt(self.path + "_3D_DM_density_all.csv", 
+        if self.run == "HJ" or self.run == "HSJ":
+            file_end = "_new_all.csv"
+        else:
+            file_end = "_all.csv"
+        
+        self.DM_density_3D = np.genfromtxt(self.path + "_3D_DM_density" + file_end, 
                                            delimiter=",") #1e10Msol / (r/R200m)^3
         if self.run != "DMO":
-            self.gas_density_3D = np.genfromtxt(self.path + "_3D_gas_density_all.csv", 
+            self.gas_density_3D = np.genfromtxt(self.path + "_3D_gas_density" + file_end, 
                                                delimiter=",")
         
         self.N_rad = 44
@@ -89,15 +94,24 @@ class flamingo:
         
     def read_properties(self):
         """Get general halo properties."""
+        if self.run == "HJ" or self.run == "HSJ":
+            file_end = "_new.csv"
+        else:
+            file_end = ".csv"
+        
         accretion = np.genfromtxt(self.path 
-                                  + "_accretion.csv",
+                                  + "_accretion" + file_end,
                                   delimiter=",")
         accretion[np.isinf(accretion)] = np.nan
         self.accretion = accretion
-        self.M200m = np.genfromtxt(self.path + "_M200m.csv",
+        self.M200m = np.genfromtxt(self.path + "_M200m" + file_end,
                                    delimiter=",")
         if self.run != "DMO":
-            gas_properties = np.genfromtxt(self.path + "_gas_properties_all.csv",
+            if self.run == "HJ" or self.run == "HSJ":
+                file_end = "_new_all.csv"
+            else:
+                file_end = "_all.csv"
+            gas_properties = np.genfromtxt(self.path + "_gas_properties" + file_end,
                                        delimiter=",")
             self.energy = gas_properties[:,2]
             self.hot_gas_fraction = gas_properties[:,1]
